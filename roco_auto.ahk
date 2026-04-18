@@ -54,7 +54,7 @@ HealthBarColor3 := 0xaf3d3e
 InitGui() {
   global ui
 
-  TraySetIcon("app.ico", 1, true)
+  ; TraySetIcon("app.ico", 1, true)
 
   ui := Gui("-Resize -MaximizeBox -MinimizeBox +AlwaysOnTop")
   ui.Title := "洛克王国  自动避战"
