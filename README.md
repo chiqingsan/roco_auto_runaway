@@ -20,7 +20,8 @@ SendKey("f")
 如果不小心牵手断了, 也可以自动牵手
 
 
-测试设备为**2560x1440全屏, 暂不支持窗口化游戏(后续计划支持)** 
+测试设备为**2560x1440全屏, 暂不支持窗口化游戏(后续计划支持)**   
 最大可能进行了不同分辨率的兼容, 理论上所有分辨率都可使用
 
-<img width="1192" height="656" alt="image" src="https://github.com/user-attachments/assets/176b30c2-f3b5-4d33-bbcb-9a7e54fb520c" />
+<img width="425" height="247" alt="image" src="https://github.com/user-attachments/assets/cdc8de9b-97e8-410b-9bea-961a76b76f69" />
+
