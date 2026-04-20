@@ -2,10 +2,14 @@
 #SingleInstance Force
 CoordMode "Pixel", "Screen"
 
+VERSION := "1.1"
 
 class Config {
   static width := A_ScreenWidth
   static height := A_ScreenHeight
+
+  static scaleX  := A_ScreenWidth / 2560
+  static scaleY := A_ScreenHeight / 1440
 }
 
 
@@ -24,40 +28,104 @@ class UIClass {
 }
 
 
-; 聚能黄色五角星色值 #ffc65f
-EnergyColor := 0xffc65f
-; 聚能黄色五角星旁边的定位色值
-; x的黑色
-EnergyColorNearby_1 := 0x272727
-; 聚能字的灰白色
-EnergyColorNearby_2 := 0xc3c3b9
-EnergyColorNearby_3 := 0xdbd4c5
-; 聚能图标的白色
-EnergyColorNearby_4 := 0xf4eee1
-; 聚能黑灰底色
-EnergyColorNearby_5 := 0x5c5648
-; 换精灵时左下角的绿色心
-GreenLove_1 := 0x82bf38
-GreenLove_2 := 0x64a517
-GreenLove_3 := 0x3d3d3d
+; 特征区域特征
+class IdentifyingFeatureInformation {
+  ; 获取转换后的特征区域对象
+  static getConvertedIdentifyingFeatureRegion(region) {
+    return {
+      left: Round(region.left * Config.scaleX),
+      top: Round(region.top * Config.scaleY),
+      right: Round(region.right * Config.scaleX),
+      bottom: Round(region.bottom * Config.scaleY),
+
+      colors: region.colors.Clone()
+    }
+  }
 
 
-; 左上角血条颜色 绿色 健康
-HealthBarColor1 := 0x73c615
-; 左上角血条颜色 黄色 受伤
-HealthBarColor2 := 0xfcb641
-; 左上角血条颜色 红色 濒死
-HealthBarColor3 := 0xaf3d3e
+  ; 左上角的大世界徽标区域 420x180
+  static starLogo := {
+    left: 0,
+    top: 0,
+    right: 420,
+    bottom: 180,
+    
+    ; 特征色值
+    colors: [0x2469ba, 0x64d1fd, 0x266ebd, 0x73c615, 0x5ca011]
+  }
+
+
+  ; 进入战斗后, 左上角的精灵血条信息区域 420x180
+  static hpInformation := {
+    left: 0,
+    top: 0,
+    right: 420,
+    bottom: 180,
+    ; 特征色值
+    colors: [0xffc65f, 0x3d3d3d, 0x79786f, 0xf4eee1, 0xffffff]
+  }
+  
+
+  ; 换人界面左下角的绿色心区域
+  static greenLove := {
+    left: 88,
+    top: 1156,
+    right: 322+88,
+    bottom: 201+1156,
+    colors: [0x85c13c, 0x65a617, 0x3d3d3d, 0x66a619, 0xffffff]
+  }
+
+  ; 左下角的聚能图标区域
+  static gatherEnergy := {
+    left: 0,
+    top: 1150,
+    right: 250,
+    bottom: 1440,
+    colors: [0xffc65f, 0x272727, 0x4f4e4b, 0xf4eee1, 0x5c5648]
+  }
+
+}
+
+
+; 零散的色值
+class ScatteredColors {
+  ; 左上角血条颜色 绿色 健康
+  static HealthBarColor1 := 0x73c615
+  ; 左上角血条颜色 黄色 受伤
+  static HealthBarColor2 := 0xfcb641
+  ; 左上角血条颜色 红色 濒死
+  static HealthBarColor3 := 0xaf3d3e
+}
+
+
+; 简化一下获取转换后的特征区域对象的函数调用
+GetScaledIdentifyingFeatureRegion(region) {
+  return IdentifyingFeatureInformation.getConvertedIdentifyingFeatureRegion(region)
+}
+
+
+; 判断一个区域内是否包含了所有特征色值, deviationValue是色值误差范围, 默认8
+AreaHasAllFeatureColors(region, deviationValue := 8) {
+  convertedRegion := GetScaledIdentifyingFeatureRegion(region)
+  for color in convertedRegion.colors {
+    if !PixelSearch(&_, &_, convertedRegion.left, convertedRegion.top, convertedRegion.right, convertedRegion.bottom, color, deviationValue) {
+      return false
+    }
+  }
+  return true
+}
 
 
 ; ================== GUI ==================
 InitGui() {
   global ui
 
-  ; TraySetIcon("app.ico", 1, true)
+  if FileExist("app.ico") {
+    TraySetIcon("app.ico", 1, true)
+  }
 
   ui := Gui("-Resize -MaximizeBox -MinimizeBox +AlwaysOnTop")
-  ui.Title := "洛克王国  自动避战"
+  ui.Title := "洛克王国  自动避战 v" VERSION
 
 
   ; --- 不抢焦点 ---
@@ -114,17 +182,52 @@ ElevatePrivileges() {
   }
 }
 
-
-DrawAccurate(x, y, size := 20) {
+; 根据输入的xy坐标, 绘制一个十字准心, 来标识该点位
+DrawAccurate(x, y, size := 20, w := 2, time := 2000) {
   g1 := Gui("+AlwaysOnTop -Caption +ToolWindow")
   g1.BackColor := "Red"
-  g1.Show("x" (x - size) " y" y " w" (size * 2) " h2 NA")
+  g1.Show("x" (x - size) " y" y " w" (size * 2) " h" w " NA")
 
   g2 := Gui("+AlwaysOnTop -Caption +ToolWindow")
   g2.BackColor := "Red"
-  g2.Show("x" x " y" (y - size) " w2 h" (size * 2) " NA")
+  g2.Show("x" x " y" (y - size) " w" w " h" (size * 2) " NA")
 
-  SetTimer((*) => (g1.Destroy(), g2.Destroy()), -2000)
+  SetTimer((*) => (g1.Destroy(), g2.Destroy()), -time)
+}
+
+; 根据输入的区域坐标, left top right bottom, 绘制一个矩形框, 来标识该区域
+DrawRectangle(left, top, right, bottom, w := 2, time := 2000) {
+  ; 计算宽高
+  width := right - left
+  height := bottom - top
+
+  ; 上边
+  gTop := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x20")
+  gTop.BackColor := "Red"
+  gTop.Show("x" left " y" top " w" width " h" w " NA")
+
+  ; 下边
+  gBottom := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x20")
+  gBottom.BackColor := "Red"
+  gBottom.Show("x" left " y" (bottom - w) " w" width " h" w " NA")
+
+  ; 左边
+  gLeft := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x20")
+  gLeft.BackColor := "Red"
+  gLeft.Show("x" left " y" top " w" w " h" height " NA")
+
+  ; 右边
+  gRight := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x20")
+  gRight.BackColor := "Red"
+  gRight.Show("x" (right - w) " y" top " w" w " h" height " NA")
+
+  ; 定时关闭
+  SetTimer(() => (
+    gTop.Destroy(),
+    gBottom.Destroy(),
+    gLeft.Destroy(),
+    gRight.Destroy()
+  ), -time)
 }
 
 ; ================== 测试用 ==================
@@ -193,13 +296,16 @@ onClickRunAwayBtn(ctrl, *) {
 
 ; 自动避战逻辑, 循环检查是否进战
 whetherFighting() {
+  ; 清理可能多余的定时任务
+  SetTimer(whetherFighting, 0)
+
   ; 检查状态是否被关闭
   if RunningStatus.avoidWarState == 0 {
     return
   }
 
   AddLog("正在检查是否进入战斗...")
-  if whetherEnterCombat() {
+  if !isItInNormalCondition() && whetherEnterCombat() {
     if RunningStatus.avoidWarState == 1 {
       AddLog("进入战斗, 目前模式为: 自动聚气")
       ; 自动聚气
@@ -211,40 +317,15 @@ whetherFighting() {
     }
   }
 
-  ; 500ms检查一次是否进入了战斗
+  ; 1000ms检查一次是否进入了战斗
   SetTimer(whetherFighting, -1000)
 }
 
 
 ; 判断是否进入了战斗
 whetherEnterCombat() {
-  ; 颜色偏差值
-  deviationValue := 10
-  ; 查找屏幕的左下小部分
-  ; x起始点和终点
-  startX := 0
-  endX := Config.width * 0.15
-  ; y起始点和终点
-  startY := Config.height * 0.8
-  endY := Config.height
-  ;400x170
-  ; 先进行粗略判断
-  if PixelSearch(&x, &y, startX, startY, endX, endY, EnergyColor, deviationValue) {
-    if PixelSearch(&_, &_, startX, startY, endX, endY, EnergyColorNearby_1, deviationValue)
-      && PixelSearch(&x_, &y_, startX, startY, endX, endY, EnergyColorNearby_2, deviationValue)
-      && PixelSearch(&_, &_, startX, startY, endX, endY, EnergyColorNearby_3, deviationValue)
-      && PixelSearch(&_, &_, startX, startY, endX, endY, EnergyColorNearby_4, deviationValue)
-      && PixelSearch(&_, &_, startX, startY, endX, endY, EnergyColorNearby_5, deviationValue) {
-      ; && PixelSearch(&a_, &b_, 0, 0, width * 0.15, height * 0.1, HealthBarColor, 5)
-      ; 左下角聚能色值验证 + 左上角血条色值验证
-      ; DrawBox(x_, y_)
-      ; DrawBox(a_, b_)
-
-      if getHealthBarColor() > 0 {
-        return true
-      }
-    }
-
+  if AreaHasAllFeatureColors(IdentifyingFeatureInformation.gatherEnergy) && getHealthBarColor() > 0 {
+    return true
   }
 
   return false
@@ -253,20 +334,15 @@ whetherEnterCombat() {
 
 ; 战斗中进行聚能
 collectEnergy() {
-  ; 颜色偏差值
-  deviationValue := 10
-  ; 查找屏幕的左下小部分
-  ; x起始点和终点
-  startX := 0
-  endX := Config.width * 0.15
-  ; y起始点和终点
-  startY := Config.height * 0.8
-  endY := Config.height
+  SetTimer(collectEnergy, 0)
+
+  if RunningStatus.avoidWarState != 1 {
+    return
+  }
+
 
   ; 这里检查一下是否在换人界面, 如果在换人界面就说明精灵被打死了, 直接逃跑
-  if PixelSearch(&_, &_, startX, startY, endX, endY, GreenLove_1, deviationValue)
-    && PixelSearch(&_, &_, startX, startY, endX, endY, GreenLove_2, deviationValue)
-    && PixelSearch(&_, &_, startX, startY, endX, endY, GreenLove_3, deviationValue) {
+  if AreaHasAllFeatureColors(IdentifyingFeatureInformation.greenLove) {
     AddLog("处于换人界面, 启用自动逃跑")
     ; 被打死了就逃跑
     exitCombat()
@@ -280,23 +356,14 @@ collectEnergy() {
 
 
   ; 检查一下是否还存在聚气图标
-  if PixelSearch(&x, &y, startX, startY, endX, endY, EnergyColor, deviationValue) {
-    if PixelSearch(&_, &_, startX, startY, endX, endY, EnergyColorNearby_1, deviationValue)
-      && PixelSearch(&x_, &y_, startX, startY, endX, endY, EnergyColorNearby_2, deviationValue)
-      && PixelSearch(&_, &_, startX, startY, endX, endY, EnergyColorNearby_3, deviationValue)
-      && PixelSearch(&_, &_, startX, startY, endX, endY, EnergyColorNearby_4, deviationValue)
-      && PixelSearch(&_, &_, startX, startY, endX, endY, EnergyColorNearby_5, deviationValue) {
-
-      ;还能聚气就一直聚气
-      AddLog("开始执行聚气动作")
-      Sleep(500)
-      SendKey('x')
-      Sleep(3000)
-    }
+  if AreaHasAllFeatureColors(IdentifyingFeatureInformation.gatherEnergy) {
+    ;还能聚气就一直聚气
+    AddLog("开始执行聚气动作")
+    SendKey('x')
   }
 
   ; 递归调用一下
-  SetTimer(collectEnergy, -2000)
+  SetTimer(collectEnergy, -2500)
 }
 
 
@@ -306,8 +373,7 @@ exitCombat() {
     Sleep(500)
     SendKey('Esc')
     Sleep(1000)
-    PixelSearch(&x, &y, Config.width * 0.5, Config.height * 0.7, Config.width, Config.height, 0xf4eee1, 5)
-    if x != '' && y != '' {
+    if PixelSearch(&x, &y, Config.width * 0.5, Config.height * 0.7, Config.width, Config.height, 0xf4eee1, 5) {
       AddLog("开始执行逃跑操作")
       Click(x, y + 10)
     }
@@ -316,17 +382,12 @@ exitCombat() {
 
 ; 获取血条状态 return 0: 未发现血条 1:健康 2:受伤 3:濒危
 getHealthBarColor() {
-  ; x起始点和终点
-  startX := 0
-  endX := Config.width * 0.15
-  ; y起始点和终点
-  startY := 0
-  endY := Config.height * 0.1
-  if PixelSearch(&x_, &y_, startX, startY, endX, endY, HealthBarColor1, 5) {
+  hpInformation := GetScaledIdentifyingFeatureRegion(IdentifyingFeatureInformation.hpInformation)
+  if PixelSearch(&x_, &y_, hpInformation.left, hpInformation.top, hpInformation.right, hpInformation.bottom, ScatteredColors.HealthBarColor1, 5) {
     return 1
-  } else if PixelSearch(&x_, &y_, startX, startY, endX, endY, HealthBarColor2, 5) {
+  } else if PixelSearch(&x_, &y_, hpInformation.left, hpInformation.top, hpInformation.right, hpInformation.bottom, ScatteredColors.HealthBarColor2, 5) {
     return 2
-  } else if PixelSearch(&x_, &y_, startX, startY, endX, endY, HealthBarColor3, 5) {
+  } else if PixelSearch(&x_, &y_, hpInformation.left, hpInformation.top, hpInformation.right, hpInformation.bottom, ScatteredColors.HealthBarColor3, 5) {
     return 3
   }
 
@@ -335,9 +396,7 @@ getHealthBarColor() {
 
 ; 检查是否处于大世界状态
 isItInNormalCondition() {
-  if PixelSearch(&_, &_, 0, 0, Config.width * 0.1, Config.height * 0.1, 0x64d1fd, 5)
-    && PixelSearch(&_, &_, 0, 0, Config.width * 0.1, Config.height * 0.1, 0xffc65f, 5)
-    && PixelSearch(&_, &_, 0, 0, Config.width * 0.1, Config.height * 0.1, 0x2469ba, 5) {
+  if AreaHasAllFeatureColors(IdentifyingFeatureInformation.starLogo, 5) {
     return true
   }
   return false
@@ -382,10 +441,12 @@ AddLog(msg) {
   if (AddLog.lines.Length > 5)
     AddLog.lines.RemoveAt(1)
 
-  ; === 重绘 ===
-  UIClass.logBox.Value := ""
+  ; === 一次性拼接 ===
+  text := ""
   for line in AddLog.lines
-    UIClass.logBox.Value .= line "`r`n"
+    text .= line "`r`n"
+
+  UIClass.logBox.Value := text
 
   ; 滚动到底部
   SendMessage(0x115, 7, 0, UIClass.logBox.Hwnd)
