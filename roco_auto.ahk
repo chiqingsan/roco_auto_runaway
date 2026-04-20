@@ -117,8 +117,8 @@ GetScaledIdentifyingFeatureRegion(region) {
 }
 
 
-; 判断一个区域内是否包含了所有特征色值, deviationValue是色值误差范围, 默认5
-AreaHasAllFeatureColors(region, deviationValue := 5) {
+; 判断一个区域内是否包含了所有特征色值, deviationValue是色值误差范围, 默认8
+AreaHasAllFeatureColors(region, deviationValue := 8) {
   convertedRegion := GetScaledIdentifyingFeatureRegion(region)
   for color in convertedRegion.colors {
     if !PixelSearch(&_, &_, convertedRegion.left, convertedRegion.top, convertedRegion.right, convertedRegion.bottom, color, deviationValue) {
@@ -366,7 +366,7 @@ whetherEnterCombat() {
   if AreaHasAllFeatureColors(IdentifyingFeatureInformation.gatherEnergy) && getHealthBarColor() > 0 {
     return true
   }
-
+  
   return false
 }
 
@@ -429,7 +429,7 @@ automaticallyHoldHands() {
 
   if isItInNormalCondition() && AreaHasAllFeatureColors(IdentifyingFeatureInformation.holdHands) {
     AddLog("检测到牵手选项, 执行自动牵手操作")
-    SendKey("e")
+    SendKey("f")
   }
 
   SetTimer(automaticallyHoldHands, -3000)
