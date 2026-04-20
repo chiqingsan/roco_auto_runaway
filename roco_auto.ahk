@@ -2,7 +2,7 @@
 #SingleInstance Force
 CoordMode "Pixel", "Screen"
 
-VERSION := "1.25"
+VERSION := "1.26"
 
 class Config {
   static width := A_ScreenWidth
@@ -117,8 +117,8 @@ GetScaledIdentifyingFeatureRegion(region) {
 }
 
 
-; 判断一个区域内是否包含了所有特征色值, deviationValue是色值误差范围, 默认8
-AreaHasAllFeatureColors(region, deviationValue := 8) {
+; 判断一个区域内是否包含了所有特征色值, deviationValue是色值误差范围, 默认10
+AreaHasAllFeatureColors(region, deviationValue := 10) {
   convertedRegion := GetScaledIdentifyingFeatureRegion(region)
   for color in convertedRegion.colors {
     if !PixelSearch(&_, &_, convertedRegion.left, convertedRegion.top, convertedRegion.right, convertedRegion.bottom, color, deviationValue) {
@@ -363,7 +363,7 @@ whetherFighting() {
 
 ; 判断是否进入了战斗
 isEnterCombat() {
-  if AreaHasAllFeatureColors(IdentifyingFeatureInformation.hpInformation, 10) && getHealthBarColor() > 0 {
+  if AreaHasAllFeatureColors(IdentifyingFeatureInformation.hpInformation, 12) && getHealthBarColor() > 0 {
     return true
   }
 
