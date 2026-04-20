@@ -2,7 +2,7 @@
 #SingleInstance Force
 CoordMode "Pixel", "Screen"
 
-VERSION := "1.21"
+VERSION := "1.25"
 
 class Config {
   static width := A_ScreenWidth
@@ -344,7 +344,7 @@ whetherFighting() {
   }
 
   AddLog("正在检查是否进入战斗...")
-  if !isItInNormalCondition() && whetherEnterCombat() {
+  if !isItInNormalCondition() && isEnterCombat() {
     if RunningStatus.avoidWarState == 1 {
       AddLog("进入战斗, 目前模式为: 自动聚气")
       ; 自动聚气
@@ -362,8 +362,8 @@ whetherFighting() {
 
 
 ; 判断是否进入了战斗
-whetherEnterCombat() {
-  if AreaHasAllFeatureColors(IdentifyingFeatureInformation.gatherEnergy) && getHealthBarColor() > 0 {
+isEnterCombat() {
+  if AreaHasAllFeatureColors(IdentifyingFeatureInformation.hpInformation, 10) && getHealthBarColor() > 0 {
     return true
   }
 
