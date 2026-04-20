@@ -2,7 +2,7 @@
 #SingleInstance Force
 CoordMode "Pixel", "Screen"
 
-VERSION := "1.1"
+VERSION := "1.2"
 
 class Config {
   static width := A_ScreenWidth
@@ -17,6 +17,9 @@ class Config {
 class RunningStatus {
   ; 是否启动自动聚气/逃跑 0: 关闭 1:自动聚气 2:自动逃跑
   static avoidWarState := 0
+
+  ; 是否启用自动牵手功能
+  static isHoldHandsAutomatically := false
 }
 
 ; ui实例类
@@ -24,6 +27,7 @@ class UIClass {
   static ui := ""
   static gatherEnergyBtn := ""
   static runAwayBtn := ""
+  static HoldHandsAutomaticallyBtn := ""
   static logBox := ""
 }
 
@@ -84,6 +88,15 @@ class IdentifyingFeatureInformation {
     colors: [0xffc65f, 0x272727, 0x4f4e4b, 0xf4eee1, 0x5c5648]
   }
 
+
+  ; 牵手的图标区域
+  static holdHands := {
+    left: 1343,
+    top: 628,
+    right: 638+1343,
+    bottom: 337+628,
+    colors: [0xdc9827, 0xfaf3e4, 0xf4eee1, 0x272727, 0x3d3d3d, 0xffffff] ;0x2a2928, 0xf4ba53
+  }
 }
 
 
@@ -104,8 +117,8 @@ GetScaledIdentifyingFeatureRegion(region) {
 }
 
 
-; 判断一个区域内是否包含了所有特征色值, deviationValue是色值误差范围, 默认8
-AreaHasAllFeatureColors(region, deviationValue := 8) {
+; 判断一个区域内是否包含了所有特征色值, deviationValue是色值误差范围, 默认5
+AreaHasAllFeatureColors(region, deviationValue := 5) {
   convertedRegion := GetScaledIdentifyingFeatureRegion(region)
   for color in convertedRegion.colors {
     if !PixelSearch(&_, &_, convertedRegion.left, convertedRegion.top, convertedRegion.right, convertedRegion.bottom, color, deviationValue) {
@@ -139,19 +152,23 @@ InitGui() {
   }
 
   ; --- 按钮 ---
-  UIClass.gatherEnergyBtn := ui.AddButton("y+15 w100 h30", "自动聚气: 关")
+  UIClass.gatherEnergyBtn := ui.AddButton("y+5 w100 h30", "自动聚气: 关")
   UIClass.gatherEnergyBtn.OnEvent("Click", onClickGatherEnergyBtn)
 
-  UIClass.runAwayBtn := ui.AddButton("xm y+20 w100 h30", "自动逃跑: 关")
+  UIClass.runAwayBtn := ui.AddButton("xm y+10 w100 h30", "自动逃跑: 关")
   UIClass.runAwayBtn.OnEvent("Click", onClickRunAwayBtn)
+  
+  UIClass.HoldHandsAutomaticallyBtn := ui.AddButton("xm y+10 w100 h30", "自动牵手: 关")
+  UIClass.HoldHandsAutomaticallyBtn.OnEvent("Click", onHoldHandsAutomaticallyBtn)
+
+  ; testBtn := ui.AddButton("xm y+10 w100 h30", "测试按钮")
+  ; testBtn.OnEvent("Click", SendOnce)
 
   ; GuiCtrl := ui.AddStatusBar("h30", "运行中...")
 
-  UIClass.logBox := ui.AddEdit("ym x+15 w160 h105 ReadOnly -Border -VScroll -HScroll +Disabled")
+  UIClass.logBox := ui.AddEdit("ym x+12 w170 h105 ReadOnly -Border -VScroll -HScroll +Disabled")
   UIClass.logBox.SetFont("s9 c000000", "Consolas")
 
-
-  ; testBtn := ui.AddButton("xm y+20 w100 h30", "测试按钮")
 
   ; 设置关闭事件, 关闭gui的时候关闭脚本
   ui.OnEvent("Close", GuiClose)  ; 绑定关闭事件
@@ -162,7 +179,7 @@ InitGui() {
 
 
   UIClass.ui := ui
-  ui.Show("w300 h120 NOACTIVATE")
+  ui.Show("w300 h125 NOACTIVATE")
 }
 
 
@@ -181,6 +198,7 @@ ElevatePrivileges() {
     ExitApp
   }
 }
+
 
 ; 根据输入的xy坐标, 绘制一个十字准心, 来标识该点位
 DrawAccurate(x, y, size := 20, w := 2, time := 2000) {
@@ -294,6 +312,27 @@ onClickRunAwayBtn(ctrl, *) {
   AddLog("自动逃跑已关闭")
 }
 
+
+; 自动牵手
+onHoldHandsAutomaticallyBtn(ctrl, *) {
+  if !RunningStatus.isHoldHandsAutomatically {
+    ; 修改一下状态
+    RunningStatus.isHoldHandsAutomatically := true
+    ; 修改按键文字
+    ctrl.Text := "自动牵手: 开"
+    AddLog("自动牵手已开启")
+    automaticallyHoldHands()
+    return
+  }
+
+  ; 修改一下状态
+  RunningStatus.isHoldHandsAutomatically := false
+  ; 修改按键文字
+  ctrl.Text := "自动牵手: 关"
+  AddLog("自动牵手已关闭")
+}
+
+
 ; 自动避战逻辑, 循环检查是否进战
 whetherFighting() {
   ; 清理可能多余的定时任务
@@ -379,6 +418,23 @@ exitCombat() {
     }
   }
 }
+
+; 自动牵手
+automaticallyHoldHands() {
+  SetTimer(automaticallyHoldHands, 0)
+
+  if !RunningStatus.isHoldHandsAutomatically {
+    return
+  }
+
+  if isItInNormalCondition() && AreaHasAllFeatureColors(IdentifyingFeatureInformation.holdHands) {
+    AddLog("检测到牵手选项, 执行自动牵手操作")
+    SendKey("e")
+  }
+
+  SetTimer(automaticallyHoldHands, -3000)
+}
+
 
 ; 获取血条状态 return 0: 未发现血条 1:健康 2:受伤 3:濒危
 getHealthBarColor() {
