@@ -2,7 +2,7 @@
 #SingleInstance Force
 CoordMode "Pixel", "Screen"
 
-VERSION := "1.2"
+VERSION := "1.21"
 
 class Config {
   static width := A_ScreenWidth
@@ -366,7 +366,7 @@ whetherEnterCombat() {
   if AreaHasAllFeatureColors(IdentifyingFeatureInformation.gatherEnergy) && getHealthBarColor() > 0 {
     return true
   }
-  
+
   return false
 }
 
