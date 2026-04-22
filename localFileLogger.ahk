@@ -45,10 +45,9 @@ class LocalFileLogger {
         this.updateFilePath()
         this.truncateIfNeeded()
 
-        time := FormatTime(, "yyyy-MM-dd HH:mm:ss")
-        ms := SubStr(A_TickCount, -3)
+        time := FormatTime(, "yyyy-MM-dd  HH:mm:ss")
 
-        line := Format("[{}.{:03}] [{:-5}]   |   {}", time, ms, level, msg) "`n"
+        line := Format("[{}]  [{:-5}]   |   {}", time, level, msg) "`n"
 
         FileAppend(line, this.filePath, "UTF-8")
     }

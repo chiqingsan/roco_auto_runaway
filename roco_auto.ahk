@@ -5,7 +5,7 @@ CoordMode "Pixel", "Screen"
 #Include LocalFileLogger.ahk
 
 
-VERSION := "1.3"
+VERSION := "1.32"
 DEBUG_LOCALLOG := true  ; 是否开启本地调试日志
 
 class Config {
@@ -19,7 +19,7 @@ class Config {
 
 ; 当前运行状态
 class RunningStatus {
-  ; 是否启动自动聚气/逃跑 0: 关闭 1:自动聚气 2:自动逃跑 3:自动使用1技能
+  ; 是否启动自动聚气/逃跑 0: 关闭 1:自动聚气 2:自动逃跑
   static avoidWarState := 0
 
   ; 是否启用自动牵手功能
@@ -54,7 +54,6 @@ class IdentifyingFeatureInformation {
 
   ; 左上角的大世界徽标区域 420x180
   static starLogo := {
-    name: "starLogo",
     left: 0,
     top: 0,
     right: 420,
@@ -67,7 +66,6 @@ class IdentifyingFeatureInformation {
 
   ; 进入战斗后, 左上角的精灵血条信息区域 420x180
   static hpInformation := {
-    name: "hpInformation",
     left: 0,
     top: 0,
     right: 420,
@@ -79,7 +77,6 @@ class IdentifyingFeatureInformation {
 
   ; 换人界面左下角的绿色心区域
   static greenLove := {
-    name: "greenLove",
     left: 88,
     top: 1156,
     right: 322+88,
@@ -89,18 +86,16 @@ class IdentifyingFeatureInformation {
 
   ; 左下角的聚能图标区域
   static gatherEnergy := {
-    name: "gatherEnergy",
     left: 0,
     top: 1150,
     right: 250,
     bottom: 1440,
-    colors: [0xffc65f, 0x272727, 0x4f4e4b, 0xf4eee1, 0x5c5648]
+    colors: [0xffc65f, 0x272727, 0xf4eee1]
   }
 
 
   ; 牵手的图标区域
   static holdHands := {
-    name: "holdHands",
     left: 1343,
     top: 628,
     right: 638+1343,
@@ -130,20 +125,36 @@ GetScaledIdentifyingFeatureRegion(region) {
 ; 判断一个区域内是否包含了所有特征色值, deviationValue是色值误差范围, 默认10
 AreaHasAllFeatureColors(region, deviationValue := 10) {
   convertedRegion := GetScaledIdentifyingFeatureRegion(region)
-  ; 检查计数, 当计数大于1时, 尝试记录检测失败的结果, 来优化后续的检测效率
-  count := 0
+  errorNum := 0
+  errorColor := 0
 
-  for color in convertedRegion.colors {
+  for index, color in convertedRegion.colors {
     if !PixelSearch(&_, &_, convertedRegion.left, convertedRegion.top, convertedRegion.right, convertedRegion.bottom,
       color, deviationValue) {
-      if count > 0 {
-        LocalFileLogger.debug(Format("检测色值失败, 检测对象 {}, 失败色值: {}, 当前检测宽容度: {}, 当前匹配进度为 {:02}", convertedRegion.name, color, deviationValue, count))
+      if index > 1 {
+        LocalFileLogger.debug(Format("检测色值失败, 失败色值: #{:06x}, 当前检测宽容度: {:02}, 当前匹配进度为 {:02}", color, deviationValue, index))
       }
-  
+      errorNum++
+      errorColor := color
+      
+      if errorNum > 1 {
+        return false
+      }
+    }
+  }
+
+
+  if errorNum != 0 {
+    deviationValue += 10
+    LocalFileLogger.debug(Format("当前色值组中有一项色值检测失败, 启动复检, 复检色值: #{:06x}, 增加检测宽容度: {:02}", errorColor, deviationValue))
+    if !PixelSearch(&_, &_, convertedRegion.left, convertedRegion.top, convertedRegion.right, convertedRegion.bottom,
+      errorColor, deviationValue) {
+      LocalFileLogger.debug(Format("复检失败, 失败色值: #{:06x}, 当前检测宽容度: {:02}", errorColor, deviationValue))
       return false
     }
-    count++
+    LocalFileLogger.debug(Format("复检成功, 复检色值: #{:06x}, 当前检测宽容度: {:02}", errorColor, deviationValue))
   }
+
   return true
 }
 
@@ -174,9 +185,6 @@ InitGui() {
   UIClass.gatherEnergyBtn := ui.AddButton("y+5 w100 h30", "自动聚气: 关")
   UIClass.gatherEnergyBtn.OnEvent("Click", onClickGatherEnergyBtn)
 
-  UIClass.useSkills := ui.AddButton("y+5 w100 h30", "后台技能1: 关")
-  UIClass.useSkills.OnEvent("Click", onClickUseSkillsBtn)
-
   UIClass.runAwayBtn := ui.AddButton("xm y+10 w100 h30", "自动逃跑: 关")
   UIClass.runAwayBtn.OnEvent("Click", onClickRunAwayBtn)
   
@@ -188,7 +196,7 @@ InitGui() {
 
   ; GuiCtrl := ui.AddStatusBar("h30", "运行中...")
 
-  UIClass.logBox := ui.AddEdit("ym x+12 w170 h140 ReadOnly -Border -VScroll -HScroll +Disabled")
+  UIClass.logBox := ui.AddEdit("ym x+12 w170 h110 ReadOnly -Border -VScroll -HScroll +Disabled")
   UIClass.logBox.SetFont("s9 c000000", "Consolas")
 
 
@@ -201,7 +209,7 @@ InitGui() {
 
 
   UIClass.ui := ui
-  ui.Show("w300 h160 NOACTIVATE")
+  ui.Show("w300 h135 NOACTIVATE")
 }
 
 
@@ -211,6 +219,7 @@ Main() {
   InitGui()
   LocalFileLogger.enabled := DEBUG_LOCALLOG
   LocalFileLogger.init()
+  LocalFileLogger.info(Format("==========启动成功 工具版本 v{} , 当前屏幕分辨率: {}x{}==========", VERSION, Config.width, Config.height))
   AddLog("开始运行...")
 }
 Main()
@@ -304,7 +313,6 @@ onClickGatherEnergyBtn(ctrl, *) {
     ; 修改按键文字
     ctrl.Text := "自动聚气: 开"
     UIClass.runAwayBtn.Text := "自动逃跑: 关"
-    UIClass.useSkills.Text := "后台技能1: 关"
     AddLog("自动聚气已开启")
     whetherFighting()
     return
@@ -318,29 +326,6 @@ onClickGatherEnergyBtn(ctrl, *) {
 }
 
 
-; 自动使用技能1
-onClickUseSkillsBtn(ctrl, *) {
-  if RunningStatus.avoidWarState != 3 {
-    ; 修改一下状态
-    RunningStatus.avoidWarState := 3
-    ; 修改按键文字
-    ctrl.Text := "后台技能1: 开"
-    UIClass.runAwayBtn.Text := "自动逃跑: 关"
-    UIClass.gatherEnergyBtn.Text := "自动聚气: 关"
-
-    AddLog("后台技能1已开启")
-    whetherFighting()
-    return
-  }
-
-  ; 修改一下状态
-  RunningStatus.avoidWarState := 0
-  ; 修改按键文字
-  ctrl.Text := "后台技能1: 关"
-  AddLog("后台技能1已关闭")
-}
-
-
 ; 自动逃跑
 onClickRunAwayBtn(ctrl, *) {
   if RunningStatus.avoidWarState != 2 {
@@ -349,7 +334,6 @@ onClickRunAwayBtn(ctrl, *) {
     ; 修改按键文字
     ctrl.Text := "自动逃跑: 开"
     UIClass.gatherEnergyBtn.Text := "自动聚气: 关"
-    UIClass.useSkills.Text := "后台技能1: 关"
     AddLog("自动逃跑已开启")
     whetherFighting()
     return
@@ -404,14 +388,10 @@ whetherFighting() {
       ; 自动逃跑
       exitCombat()
     }
-    } else if RunningStatus.avoidWarState == 3 {
-      AddLog("进入战斗, 目前模式为: 后台技能1")
-      ; 后台技能1
-      automaticallyUseSkill1()
-    }
+  }
 
-  ; 1000ms检查一次是否进入了战斗
-  SetTimer(whetherFighting, -1000)
+  ; 1500ms检查一次是否进入了战斗
+  SetTimer(whetherFighting, -1500)
 }
 
 
