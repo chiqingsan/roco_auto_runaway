@@ -2,7 +2,11 @@
 #SingleInstance Force
 CoordMode "Pixel", "Screen"
 
-VERSION := "1.26"
+#Include LocalFileLogger.ahk
+
+
+VERSION := "1.3"
+DEBUG_LOCALLOG := true  ; 是否开启本地调试日志
 
 class Config {
   static width := A_ScreenWidth
@@ -15,7 +19,7 @@ class Config {
 
 ; 当前运行状态
 class RunningStatus {
-  ; 是否启动自动聚气/逃跑 0: 关闭 1:自动聚气 2:自动逃跑
+  ; 是否启动自动聚气/逃跑 0: 关闭 1:自动聚气 2:自动逃跑 3:自动使用1技能
   static avoidWarState := 0
 
   ; 是否启用自动牵手功能
@@ -26,6 +30,7 @@ class RunningStatus {
 class UIClass {
   static ui := ""
   static gatherEnergyBtn := ""
+  static useSkills := "" ; 自动使用技能1
   static runAwayBtn := ""
   static HoldHandsAutomaticallyBtn := ""
   static logBox := ""
@@ -49,6 +54,7 @@ class IdentifyingFeatureInformation {
 
   ; 左上角的大世界徽标区域 420x180
   static starLogo := {
+    name: "starLogo",
     left: 0,
     top: 0,
     right: 420,
@@ -61,6 +67,7 @@ class IdentifyingFeatureInformation {
 
   ; 进入战斗后, 左上角的精灵血条信息区域 420x180
   static hpInformation := {
+    name: "hpInformation",
     left: 0,
     top: 0,
     right: 420,
@@ -72,6 +79,7 @@ class IdentifyingFeatureInformation {
 
   ; 换人界面左下角的绿色心区域
   static greenLove := {
+    name: "greenLove",
     left: 88,
     top: 1156,
     right: 322+88,
@@ -81,6 +89,7 @@ class IdentifyingFeatureInformation {
 
   ; 左下角的聚能图标区域
   static gatherEnergy := {
+    name: "gatherEnergy",
     left: 0,
     top: 1150,
     right: 250,
@@ -91,6 +100,7 @@ class IdentifyingFeatureInformation {
 
   ; 牵手的图标区域
   static holdHands := {
+    name: "holdHands",
     left: 1343,
     top: 628,
     right: 638+1343,
@@ -120,10 +130,19 @@ GetScaledIdentifyingFeatureRegion(region) {
 ; 判断一个区域内是否包含了所有特征色值, deviationValue是色值误差范围, 默认10
 AreaHasAllFeatureColors(region, deviationValue := 10) {
   convertedRegion := GetScaledIdentifyingFeatureRegion(region)
+  ; 检查计数, 当计数大于1时, 尝试记录检测失败的结果, 来优化后续的检测效率
+  count := 0
+
   for color in convertedRegion.colors {
-    if !PixelSearch(&_, &_, convertedRegion.left, convertedRegion.top, convertedRegion.right, convertedRegion.bottom, color, deviationValue) {
+    if !PixelSearch(&_, &_, convertedRegion.left, convertedRegion.top, convertedRegion.right, convertedRegion.bottom,
+      color, deviationValue) {
+      if count > 0 {
+        LocalFileLogger.debug(Format("检测色值失败, 检测对象 {}, 失败色值: {}, 当前检测宽容度: {}, 当前匹配进度为 {:02}", convertedRegion.name, color, deviationValue, count))
+      }
+  
       return false
     }
+    count++
   }
   return true
 }
@@ -155,6 +174,9 @@ InitGui() {
   UIClass.gatherEnergyBtn := ui.AddButton("y+5 w100 h30", "自动聚气: 关")
   UIClass.gatherEnergyBtn.OnEvent("Click", onClickGatherEnergyBtn)
 
+  UIClass.useSkills := ui.AddButton("y+5 w100 h30", "后台技能1: 关")
+  UIClass.useSkills.OnEvent("Click", onClickUseSkillsBtn)
+
   UIClass.runAwayBtn := ui.AddButton("xm y+10 w100 h30", "自动逃跑: 关")
   UIClass.runAwayBtn.OnEvent("Click", onClickRunAwayBtn)
   
@@ -166,7 +188,7 @@ InitGui() {
 
   ; GuiCtrl := ui.AddStatusBar("h30", "运行中...")
 
-  UIClass.logBox := ui.AddEdit("ym x+12 w170 h105 ReadOnly -Border -VScroll -HScroll +Disabled")
+  UIClass.logBox := ui.AddEdit("ym x+12 w170 h140 ReadOnly -Border -VScroll -HScroll +Disabled")
   UIClass.logBox.SetFont("s9 c000000", "Consolas")
 
 
@@ -179,7 +201,7 @@ InitGui() {
 
 
   UIClass.ui := ui
-  ui.Show("w300 h125 NOACTIVATE")
+  ui.Show("w300 h160 NOACTIVATE")
 }
 
 
@@ -187,6 +209,8 @@ InitGui() {
 Main() {
   ElevatePrivileges()
   InitGui()
+  LocalFileLogger.enabled := DEBUG_LOCALLOG
+  LocalFileLogger.init()
   AddLog("开始运行...")
 }
 Main()
@@ -280,6 +304,7 @@ onClickGatherEnergyBtn(ctrl, *) {
     ; 修改按键文字
     ctrl.Text := "自动聚气: 开"
     UIClass.runAwayBtn.Text := "自动逃跑: 关"
+    UIClass.useSkills.Text := "后台技能1: 关"
     AddLog("自动聚气已开启")
     whetherFighting()
     return
@@ -292,6 +317,30 @@ onClickGatherEnergyBtn(ctrl, *) {
   AddLog("自动聚气已关闭")
 }
 
+
+; 自动使用技能1
+onClickUseSkillsBtn(ctrl, *) {
+  if RunningStatus.avoidWarState != 3 {
+    ; 修改一下状态
+    RunningStatus.avoidWarState := 3
+    ; 修改按键文字
+    ctrl.Text := "后台技能1: 开"
+    UIClass.runAwayBtn.Text := "自动逃跑: 关"
+    UIClass.gatherEnergyBtn.Text := "自动聚气: 关"
+
+    AddLog("后台技能1已开启")
+    whetherFighting()
+    return
+  }
+
+  ; 修改一下状态
+  RunningStatus.avoidWarState := 0
+  ; 修改按键文字
+  ctrl.Text := "后台技能1: 关"
+  AddLog("后台技能1已关闭")
+}
+
+
 ; 自动逃跑
 onClickRunAwayBtn(ctrl, *) {
   if RunningStatus.avoidWarState != 2 {
@@ -300,6 +349,7 @@ onClickRunAwayBtn(ctrl, *) {
     ; 修改按键文字
     ctrl.Text := "自动逃跑: 开"
     UIClass.gatherEnergyBtn.Text := "自动聚气: 关"
+    UIClass.useSkills.Text := "后台技能1: 关"
     AddLog("自动逃跑已开启")
     whetherFighting()
     return
@@ -354,7 +404,11 @@ whetherFighting() {
       ; 自动逃跑
       exitCombat()
     }
-  }
+    } else if RunningStatus.avoidWarState == 3 {
+      AddLog("进入战斗, 目前模式为: 后台技能1")
+      ; 后台技能1
+      automaticallyUseSkill1()
+    }
 
   ; 1000ms检查一次是否进入了战斗
   SetTimer(whetherFighting, -1000)
@@ -397,7 +451,7 @@ collectEnergy() {
   ; 检查一下是否还存在聚气图标
   if AreaHasAllFeatureColors(IdentifyingFeatureInformation.gatherEnergy) {
     ;还能聚气就一直聚气
-    AddLog("开始执行聚气动作")
+    AddLog("执行操作: 自动聚气")
     SendKey('x')
   }
 
@@ -413,11 +467,12 @@ exitCombat() {
     SendKey('Esc')
     Sleep(1000)
     if PixelSearch(&x, &y, Config.width * 0.5, Config.height * 0.7, Config.width, Config.height, 0xf4eee1, 5) {
-      AddLog("开始执行逃跑操作")
+      AddLog("执行操作: 自动逃跑")
       Click(x, y + 10)
     }
   }
 }
+
 
 ; 自动牵手
 automaticallyHoldHands() {
@@ -433,6 +488,24 @@ automaticallyHoldHands() {
   }
 
   SetTimer(automaticallyHoldHands, -3000)
+}
+
+
+; 自动使用1技能
+automaticallyUseSkill1() {
+  if RunningStatus.avoidWarState != 3 {
+    return
+  }
+
+  if !ProcessExist("NRC-Win64-Shipping.exe") {
+    AddLog("提示: 未检测到洛克王国游戏程序, 无法执行自动使用技能1")
+    RunningStatus.avoidWarState := 0
+    UIClass.useSkills.Text := "后台技能1: 关"
+    return
+  }
+
+  AddLog("执行操作: 使用1技能")
+  SendKeyToRoco("1")
 }
 
 
@@ -467,6 +540,20 @@ SendKey(str, time := 50) {
 }
 
 
+; 向指定程序发送按键事件(可后台)
+ControlSendKey(key, time, exe) {
+  ControlSend("{" key " down}", , "ahk_exe " exe)
+  Sleep(time)
+  ControlSend("{" key " up}", , "ahk_exe " exe)
+}
+
+
+; 给洛克王国发送按键事件
+SendKeyToRoco(key, time := 50) {
+  ControlSendKey(key, time, "NRC-Win64-Shipping.exe")
+}
+
+
 ; 添加日志
 AddLog(msg) {
 
@@ -494,7 +581,7 @@ AddLog(msg) {
   }
 
   ; === 限制5行 ===
-  if (AddLog.lines.Length > 5)
+  if (AddLog.lines.Length > 8)
     AddLog.lines.RemoveAt(1)
 
   ; === 一次性拼接 ===
