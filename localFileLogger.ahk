@@ -7,6 +7,7 @@ class LocalFileLogger {
 
     static enableDebug := true
     static enabled := true   ; 总开关
+    static version := ""  ; 版本号，如果有则自动添加到日志文件名中
 
     ; 最大 30KB
     static maxSize := 30 * 1024
@@ -47,7 +48,13 @@ class LocalFileLogger {
 
         time := FormatTime(, "yyyy-MM-dd  HH:mm:ss")
 
-        line := Format("[{}]  [{:-5}]   |   {}", time, level, msg) "`n"
+        line := Format(
+            "[{}]  [{:-5}]{}  |   {}",
+            time,
+            level,
+            this.version ? Format("  (v{})", this.version) : "",
+            msg
+        ) "`n"
 
         FileAppend(line, this.filePath, "UTF-8")
     }

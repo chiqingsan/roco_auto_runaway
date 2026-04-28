@@ -5,14 +5,14 @@ CoordMode "Pixel", "Screen"
 #Include LocalFileLogger.ahk
 
 
-VERSION := "1.32"
+VERSION := "1.35"
 DEBUG_LOCALLOG := true  ; 是否开启本地调试日志
 
 class Config {
   static width := A_ScreenWidth
   static height := A_ScreenHeight
 
-  static scaleX  := A_ScreenWidth / 2560
+  static scaleX := A_ScreenWidth / 2560
   static scaleY := A_ScreenHeight / 1440
 }
 
@@ -28,12 +28,12 @@ class RunningStatus {
 
 ; ui实例类
 class UIClass {
-  static ui := ""
-  static gatherEnergyBtn := ""
-  static useSkills := "" ; 自动使用技能1
-  static runAwayBtn := ""
-  static HoldHandsAutomaticallyBtn := ""
-  static logBox := ""
+  static ui := ""  ;main gui
+  static gatherEnergyBtn := ""  ; 自动聚气按钮
+  ; static useSkills := "" ; 自动使用技能1
+  static runAwayBtn := ""  ; 自动逃跑按钮
+  static HoldHandsAutomaticallyBtn := ""  ; 自动牵手按钮
+  static logBox := ""  ; 日志显示框
 }
 
 
@@ -46,7 +46,6 @@ class IdentifyingFeatureInformation {
       top: Round(region.top * Config.scaleY),
       right: Round(region.right * Config.scaleX),
       bottom: Round(region.bottom * Config.scaleY),
-
       colors: region.colors.Clone()
     }
   }
@@ -58,7 +57,6 @@ class IdentifyingFeatureInformation {
     top: 0,
     right: 420,
     bottom: 180,
-    
     ; 特征色值
     colors: [0x2469ba, 0x64d1fd, 0x266ebd, 0x73c615, 0x5ca011]
   }
@@ -73,14 +71,14 @@ class IdentifyingFeatureInformation {
     ; 特征色值
     colors: [0xffc65f, 0x3d3d3d, 0x79786f, 0xf4eee1, 0xffffff]
   }
-  
+
 
   ; 换人界面左下角的绿色心区域
   static greenLove := {
     left: 88,
     top: 1156,
-    right: 322+88,
-    bottom: 201+1156,
+    right: 322 + 88,
+    bottom: 201 + 1156,
     colors: [0x85c13c, 0x65a617, 0x3d3d3d, 0x66a619, 0xffffff]
   }
 
@@ -98,8 +96,8 @@ class IdentifyingFeatureInformation {
   static holdHands := {
     left: 1343,
     top: 628,
-    right: 638+1343,
-    bottom: 337+628,
+    right: 638 + 1343,
+    bottom: 337 + 628,
     colors: [0xdc9827, 0xfaf3e4, 0xf4eee1, 0x272727, 0x3d3d3d, 0xffffff] ;0x2a2928, 0xf4ba53
   }
 }
@@ -131,12 +129,17 @@ AreaHasAllFeatureColors(region, deviationValue := 10) {
   for index, color in convertedRegion.colors {
     if !PixelSearch(&_, &_, convertedRegion.left, convertedRegion.top, convertedRegion.right, convertedRegion.bottom,
       color, deviationValue) {
+      ; 如果第一个色值就检测出错了就, 直接返回false
+      if index == 1 {
+        return false
+      }
+
       if index > 1 {
         LocalFileLogger.debug(Format("检测色值失败, 失败色值: #{:06x}, 当前检测宽容度: {:02}, 当前匹配进度为 {:02}", color, deviationValue, index))
       }
       errorNum++
       errorColor := color
-      
+
       if errorNum > 1 {
         return false
       }
@@ -187,7 +190,7 @@ InitGui() {
 
   UIClass.runAwayBtn := ui.AddButton("xm y+10 w100 h30", "自动逃跑: 关")
   UIClass.runAwayBtn.OnEvent("Click", onClickRunAwayBtn)
-  
+
   UIClass.HoldHandsAutomaticallyBtn := ui.AddButton("xm y+10 w100 h30", "自动牵手: 关")
   UIClass.HoldHandsAutomaticallyBtn.OnEvent("Click", onHoldHandsAutomaticallyBtn)
 
@@ -218,11 +221,13 @@ Main() {
   ElevatePrivileges()
   InitGui()
   LocalFileLogger.enabled := DEBUG_LOCALLOG
+  LocalFileLogger.version := VERSION
   LocalFileLogger.init()
   LocalFileLogger.info(Format("==========启动成功 工具版本 v{} , 当前屏幕分辨率: {}x{}==========", VERSION, Config.width, Config.height))
-  AddLog("开始运行...")
+  AddLog(Format("启动成功 工具版本 v{} , 当前屏幕分辨率: {}x{}", VERSION, Config.width, Config.height))
 }
 Main()
+
 
 ; ================== 管理员提权 ==================
 ElevatePrivileges() {
@@ -245,6 +250,7 @@ DrawAccurate(x, y, size := 20, w := 2, time := 2000) {
 
   SetTimer((*) => (g1.Destroy(), g2.Destroy()), -time)
 }
+
 
 ; 根据输入的区域坐标, left top right bottom, 绘制一个矩形框, 来标识该区域
 DrawRectangle(left, top, right, bottom, w := 2, time := 2000) {
@@ -397,6 +403,7 @@ whetherFighting() {
 
 ; 判断是否进入了战斗
 isEnterCombat() {
+  LocalFileLogger.info("检测是否进入战斗...")
   if AreaHasAllFeatureColors(IdentifyingFeatureInformation.hpInformation, 12) && getHealthBarColor() > 0 {
     return true
   }
@@ -414,6 +421,7 @@ collectEnergy() {
   }
 
 
+  LocalFileLogger.info("检测是否处于换人界面...")
   ; 这里检查一下是否在换人界面, 如果在换人界面就说明精灵被打死了, 直接逃跑
   if AreaHasAllFeatureColors(IdentifyingFeatureInformation.greenLove) {
     AddLog("处于换人界面, 启用自动逃跑")
@@ -427,7 +435,7 @@ collectEnergy() {
     return
   }
 
-
+  LocalFileLogger.info("检查一下是否还存在聚气图标...")
   ; 检查一下是否还存在聚气图标
   if AreaHasAllFeatureColors(IdentifyingFeatureInformation.gatherEnergy) {
     ;还能聚气就一直聚气
@@ -462,6 +470,7 @@ automaticallyHoldHands() {
     return
   }
 
+  LocalFileLogger.info("检测是否处于可牵手状态...")
   if isItInNormalCondition() && AreaHasAllFeatureColors(IdentifyingFeatureInformation.holdHands) {
     AddLog("检测到牵手选项, 执行自动牵手操作")
     SendKey("f")
@@ -472,21 +481,21 @@ automaticallyHoldHands() {
 
 
 ; 自动使用1技能
-automaticallyUseSkill1() {
-  if RunningStatus.avoidWarState != 3 {
-    return
-  }
+; automaticallyUseSkill1() {
+;   if RunningStatus.avoidWarState != 3 {
+;     return
+;   }
 
-  if !ProcessExist("NRC-Win64-Shipping.exe") {
-    AddLog("提示: 未检测到洛克王国游戏程序, 无法执行自动使用技能1")
-    RunningStatus.avoidWarState := 0
-    UIClass.useSkills.Text := "后台技能1: 关"
-    return
-  }
+;   if !ProcessExist("NRC-Win64-Shipping.exe") {
+;     AddLog("提示: 未检测到洛克王国游戏程序, 无法执行自动使用技能1")
+;     RunningStatus.avoidWarState := 0
+;     UIClass.useSkills.Text := "后台技能1: 关"
+;     return
+;   }
 
-  AddLog("执行操作: 使用1技能")
-  SendKeyToRoco("1")
-}
+;   AddLog("执行操作: 使用1技能")
+;   SendKeyToRoco("1")
+; }
 
 
 ; 获取血条状态 return 0: 未发现血条 1:健康 2:受伤 3:濒危
@@ -505,6 +514,7 @@ getHealthBarColor() {
 
 ; 检查是否处于大世界状态
 isItInNormalCondition() {
+  LocalFileLogger.info("检测是否处于大世界状态...")
   if AreaHasAllFeatureColors(IdentifyingFeatureInformation.starLogo, 5) {
     return true
   }
