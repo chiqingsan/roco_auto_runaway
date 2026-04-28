@@ -5,7 +5,7 @@ CoordMode "Pixel", "Screen"
 #Include LocalFileLogger.ahk
 
 
-VERSION := "1.35"
+VERSION := "1.36"
 DEBUG_LOCALLOG := true  ; 是否开启本地调试日志
 
 class Config {
@@ -25,6 +25,7 @@ class RunningStatus {
   ; 是否启用自动牵手功能
   static isHoldHandsAutomatically := false
 }
+
 
 ; ui实例类
 class UIClass {
@@ -403,7 +404,6 @@ whetherFighting() {
 
 ; 判断是否进入了战斗
 isEnterCombat() {
-  LocalFileLogger.info("检测是否进入战斗...")
   if AreaHasAllFeatureColors(IdentifyingFeatureInformation.hpInformation, 12) && getHealthBarColor() > 0 {
     return true
   }
@@ -421,7 +421,6 @@ collectEnergy() {
   }
 
 
-  LocalFileLogger.info("检测是否处于换人界面...")
   ; 这里检查一下是否在换人界面, 如果在换人界面就说明精灵被打死了, 直接逃跑
   if AreaHasAllFeatureColors(IdentifyingFeatureInformation.greenLove) {
     AddLog("处于换人界面, 启用自动逃跑")
@@ -435,7 +434,7 @@ collectEnergy() {
     return
   }
 
-  LocalFileLogger.info("检查一下是否还存在聚气图标...")
+
   ; 检查一下是否还存在聚气图标
   if AreaHasAllFeatureColors(IdentifyingFeatureInformation.gatherEnergy) {
     ;还能聚气就一直聚气
@@ -470,7 +469,7 @@ automaticallyHoldHands() {
     return
   }
 
-  LocalFileLogger.info("检测是否处于可牵手状态...")
+
   if isItInNormalCondition() && AreaHasAllFeatureColors(IdentifyingFeatureInformation.holdHands) {
     AddLog("检测到牵手选项, 执行自动牵手操作")
     SendKey("f")
@@ -514,7 +513,6 @@ getHealthBarColor() {
 
 ; 检查是否处于大世界状态
 isItInNormalCondition() {
-  LocalFileLogger.info("检测是否处于大世界状态...")
   if AreaHasAllFeatureColors(IdentifyingFeatureInformation.starLogo, 5) {
     return true
   }

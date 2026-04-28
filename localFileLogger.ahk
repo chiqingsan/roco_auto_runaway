@@ -52,7 +52,7 @@ class LocalFileLogger {
             "[{}]  [{:-5}]{}  |   {}",
             time,
             level,
-            this.version ? Format("  (v{})", this.version) : "",
+            this.version ? Format("  [v{}]", this.version) : "",
             msg
         ) "`n"
 
