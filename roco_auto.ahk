@@ -5,7 +5,7 @@ CoordMode "Pixel", "Screen"
 #Include LocalFileLogger.ahk
 
 
-VERSION := "1.36"
+VERSION := "1.4"
 DEBUG_LOCALLOG := true  ; 是否开启本地调试日志
 
 class Config {
@@ -24,6 +24,9 @@ class RunningStatus {
 
   ; 是否启用自动牵手功能
   static isHoldHandsAutomatically := false
+
+  ; 当前ui状态, 0: 隐藏, 1: 显示
+  static uiState := 1
 }
 
 
@@ -31,7 +34,7 @@ class RunningStatus {
 class UIClass {
   static ui := ""  ;main gui
   static gatherEnergyBtn := ""  ; 自动聚气按钮
-  ; static useSkills := "" ; 自动使用技能1
+  static useSkills := "" ; 自动使用技能1
   static runAwayBtn := ""  ; 自动逃跑按钮
   static HoldHandsAutomaticallyBtn := ""  ; 自动牵手按钮
   static logBox := ""  ; 日志显示框
@@ -165,8 +168,6 @@ AreaHasAllFeatureColors(region, deviationValue := 10) {
 
 ; ================== GUI ==================
 InitGui() {
-  global ui
-
   if FileExist("app.ico") {
     TraySetIcon("app.ico", 1, true)
   }
@@ -180,10 +181,10 @@ InitGui() {
   exStyle := DllCall("GetWindowLongPtr", "Ptr", hwnd, "Int", -20, "Ptr")
   DllCall("SetWindowLongPtr", "Ptr", hwnd, "Int", -20, "Ptr", exStyle | 0x08000000)
 
-  OnMessage(0x21, WM_MOUSEACTIVATE)
-  WM_MOUSEACTIVATE(*) {
-    return 3  ; MA_NOACTIVATE
-  }
+  ; OnMessage(0x21, WM_MOUSEACTIVATE)
+  ; WM_MOUSEACTIVATE(*) {
+  ;   return 3  ; MA_NOACTIVATE
+  ; }
 
   ; --- 按钮 ---
   UIClass.gatherEnergyBtn := ui.AddButton("y+5 w100 h30", "自动聚气: 关")
@@ -192,15 +193,19 @@ InitGui() {
   UIClass.runAwayBtn := ui.AddButton("xm y+10 w100 h30", "自动逃跑: 关")
   UIClass.runAwayBtn.OnEvent("Click", onClickRunAwayBtn)
 
+  UIClass.useSkills := ui.AddButton("xm y+10 w100 h30", "后台技能: 关")
+  UIClass.useSkills.OnEvent("Click", onClickUseSkillsBtn)
+
   UIClass.HoldHandsAutomaticallyBtn := ui.AddButton("xm y+10 w100 h30", "自动牵手: 关")
   UIClass.HoldHandsAutomaticallyBtn.OnEvent("Click", onHoldHandsAutomaticallyBtn)
+
 
   ; testBtn := ui.AddButton("xm y+10 w100 h30", "测试按钮")
   ; testBtn.OnEvent("Click", SendOnce)
 
   ; GuiCtrl := ui.AddStatusBar("h30", "运行中...")
 
-  UIClass.logBox := ui.AddEdit("ym x+12 w170 h110 ReadOnly -Border -VScroll -HScroll +Disabled")
+  UIClass.logBox := ui.AddEdit("ym x+12 w170 h145 ReadOnly -Border -VScroll -HScroll +Disabled")
   UIClass.logBox.SetFont("s9 c000000", "Consolas")
 
 
@@ -213,7 +218,20 @@ InitGui() {
 
 
   UIClass.ui := ui
-  ui.Show("w300 h135 NOACTIVATE")
+  ui.Show("w300 h165 NoActivate")
+}
+
+
+; ui快捷键隐藏/显示
+QuickHide(*) {
+  AddLog("快捷键触发, 切换UI显示/隐藏状态")
+  if RunningStatus.uiState == 0 {
+    UIClass.ui.Show("NoActivate")
+    RunningStatus.uiState := 1
+  } else {
+    UIClass.ui.Hide()
+    RunningStatus.uiState := 0
+  }
 }
 
 
@@ -226,9 +244,10 @@ Main() {
   LocalFileLogger.init()
   LocalFileLogger.info(Format("==========启动成功 工具版本 v{} , 当前屏幕分辨率: {}x{}==========", VERSION, Config.width, Config.height))
   AddLog(Format("启动成功 工具版本 v{} , 当前屏幕分辨率: {}x{}", VERSION, Config.width, Config.height))
+  ; 监听按键隐藏/显示ui
+  Hotkey("~f9", QuickHide)
 }
 Main()
-
 
 ; ================== 管理员提权 ==================
 ElevatePrivileges() {
@@ -311,6 +330,21 @@ ActivateWindowById(hwnd) {
 }
 
 
+; 修改互斥的UI状态, 比如自动聚气, 自动逃跑, 后台技能是互斥的, 不能同时开启
+ModifyMutuallyExclusiveUIStates(newStatus) {
+    if (newStatus == 1) {
+      UIClass.runAwayBtn.Text := "自动逃跑: 关"
+      UIClass.useSkills.Text := "后台技能: 关"
+    } else if (newStatus == 2) {
+      UIClass.gatherEnergyBtn.Text := "自动聚气: 关"
+      UIClass.useSkills.Text := "后台技能: 关"
+    } else if (newStatus == 3) {
+      UIClass.gatherEnergyBtn.Text := "自动聚气: 关"
+      UIClass.runAwayBtn.Text := "自动逃跑: 关"
+    }
+}
+
+
 ; 按键事件
 ; 自动聚气
 onClickGatherEnergyBtn(ctrl, *) {
@@ -319,7 +353,7 @@ onClickGatherEnergyBtn(ctrl, *) {
     RunningStatus.avoidWarState := 1
     ; 修改按键文字
     ctrl.Text := "自动聚气: 开"
-    UIClass.runAwayBtn.Text := "自动逃跑: 关"
+    ModifyMutuallyExclusiveUIStates(RunningStatus.avoidWarState)
     AddLog("自动聚气已开启")
     whetherFighting()
     return
@@ -340,7 +374,7 @@ onClickRunAwayBtn(ctrl, *) {
     RunningStatus.avoidWarState := 2
     ; 修改按键文字
     ctrl.Text := "自动逃跑: 开"
-    UIClass.gatherEnergyBtn.Text := "自动聚气: 关"
+    ModifyMutuallyExclusiveUIStates(RunningStatus.avoidWarState)
     AddLog("自动逃跑已开启")
     whetherFighting()
     return
@@ -351,6 +385,36 @@ onClickRunAwayBtn(ctrl, *) {
   ; 修改按键文字
   ctrl.Text := "自动逃跑: 关"
   AddLog("自动逃跑已关闭")
+}
+
+
+; 后台使用技能1
+onClickUseSkillsBtn(ctrl, *) {
+
+  if !ProcessExist("NRC-Win64-Shipping.exe") {
+    AddLog("提示: 未检测到洛克王国游戏程序, 无法执行自动使用技能1")
+    RunningStatus.avoidWarState := 0
+    UIClass.useSkills.Text := "后台技能1: 关"
+    return
+  }
+
+
+  if RunningStatus.avoidWarState != 3 {
+    ; 修改一下状态
+    RunningStatus.avoidWarState := 3
+    ; 修改按键文字
+    ctrl.Text := "后台技能: 开"
+    ModifyMutuallyExclusiveUIStates(RunningStatus.avoidWarState)
+    AddLog("后台使用技能已开启")
+    automaticallyUseSkill1()
+    return
+  }
+
+  ; 修改一下状态
+  RunningStatus.avoidWarState := 0
+  ; 修改按键文字
+  ctrl.Text := "后台技能: 关"
+  AddLog("后台使用技能已关闭")
 }
 
 
@@ -380,7 +444,7 @@ whetherFighting() {
   SetTimer(whetherFighting, 0)
 
   ; 检查状态是否被关闭
-  if RunningStatus.avoidWarState == 0 {
+  if RunningStatus.avoidWarState == 0 || RunningStatus.avoidWarState == 3 {
     return
   }
 
@@ -480,21 +544,24 @@ automaticallyHoldHands() {
 
 
 ; 自动使用1技能
-; automaticallyUseSkill1() {
-;   if RunningStatus.avoidWarState != 3 {
-;     return
-;   }
+automaticallyUseSkill1() {
+  if RunningStatus.avoidWarState != 3 {
+    return
+  }
 
-;   if !ProcessExist("NRC-Win64-Shipping.exe") {
-;     AddLog("提示: 未检测到洛克王国游戏程序, 无法执行自动使用技能1")
-;     RunningStatus.avoidWarState := 0
-;     UIClass.useSkills.Text := "后台技能1: 关"
-;     return
-;   }
+  activeExe := WinGetProcessName("A")
 
-;   AddLog("执行操作: 使用1技能")
-;   SendKeyToRoco("1")
-; }
+  if (activeExe != "NRC-Win64-Shipping.exe") {
+    AddLog("当前活动窗口: " activeExe ", 不是洛克王国, 准备发送后台按键")
+    SendKeyToRoco("1")
+  } else {
+    AddLog("当前活动窗口: " activeExe ", 准备发送前台按键")
+    SendKey("1")
+  }
+
+  SetTimer(automaticallyUseSkill1, 0)
+  SetTimer(automaticallyUseSkill1, -1500)
+}
 
 
 ; 获取血条状态 return 0: 未发现血条 1:健康 2:受伤 3:濒危
