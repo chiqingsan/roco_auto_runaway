@@ -5,7 +5,7 @@ CoordMode "Pixel", "Screen"
 #Include LocalFileLogger.ahk
 
 
-VERSION := "1.4"
+VERSION := "1.41"
 DEBUG_LOCALLOG := true  ; 是否开启本地调试日志
 
 class Config {
@@ -560,7 +560,8 @@ automaticallyUseSkill1() {
   }
 
   SetTimer(automaticallyUseSkill1, 0)
-  SetTimer(automaticallyUseSkill1, -1500)
+  randomNum := Random(1500, 4000)
+  SetTimer(automaticallyUseSkill1, -randomNum)
 }
 
 
@@ -641,8 +642,9 @@ AddLog(msg) {
 
   ; === 一次性拼接 ===
   text := ""
-  for line in AddLog.lines
-    text .= line "`r`n"
+  for index, line in AddLog.lines {
+    text .= (index = AddLog.lines.Length ? line : line "`r`n")
+  }
 
   UIClass.logBox.Value := text
 
