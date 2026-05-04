@@ -19,4 +19,4 @@
 测试设备为**2560x1440全屏, 暂不支持窗口化游戏(后续计划支持)**   
 最大可能进行了不同分辨率的兼容, 理论上所有分辨率都可使用
 
-<img width="358" height="253" alt="image" src="https://github.com/user-attachments/assets/36ed7261-8d02-4216-a8fb-f30474b67a70" />
+<img width="378" height="273" alt="image" src="https://github.com/user-attachments/assets/1216fce0-8cc2-49b2-bd02-99d847a28575" />
