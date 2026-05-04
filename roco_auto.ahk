@@ -5,7 +5,7 @@ CoordMode "Pixel", "Screen"
 #Include LocalFileLogger.ahk
 
 
-VERSION := "1.41"
+VERSION := "1.42"
 DEBUG_LOCALLOG := true  ; 是否开启本地调试日志
 
 class Config {
