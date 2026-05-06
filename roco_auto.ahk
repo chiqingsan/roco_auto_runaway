@@ -75,7 +75,7 @@ class IdentifyingFeatureInformation {
     static hpInformation := {
         left: 0,
         top: 0,
-        right: 420,
+        right: 865,
         bottom: 180,
         ; 特征色值
         colors: [0xffc65f, 0x3d3d3d, 0x79786f, 0xf4eee1, 0xffffff]
@@ -120,7 +120,7 @@ class IdentifyingFeatureInformation {
         colors: [0xffc65f, 0xff3fa1, 0xf4eee1, 0x3d3d3d, 0xf4eee1, 0xffffff]
     }
 
-    ; 敌方污染被击败后真实血条的图标区域
+    ; 敌方污染被击败后 为污染精灵的 图标区域
     static enemyCatchableRegion := {
         left: 2096,
         top: 0,
@@ -129,13 +129,22 @@ class IdentifyingFeatureInformation {
         colors: [0xffc65f, 0x272727, 0xfd0176, 0xaf3d3e, 0xf4eee1, 0x3d3d3d] ;, 0xf4eee1, 0xffffff
     }
 
+    ; 敌方污染被击败后 为正常精灵的 图标区域
+    static ordinaryElfRegion := {
+        left: 2096,
+        top: 0,
+        right: 464 + 2096,
+        bottom: 192 + 0,
+        colors: [0xffc65f, 0x272727, 0xaf3d3e, 0xf4eee1, 0xffffff] ;, 0xf4eee1, 0xffffff
+    }
+
     ; 敌方污染击败后异色出现的图标区域
     static shinyElfIndicatorRegion := {
         left: 1407,
         top: 344,
         right: 629 + 1407,
         bottom: 656 + 344,
-        colors: [0x39a2cb, 0xfdc55e, 0xf4eee1, 0xf5bf5b]
+        colors: [0x39a2cb, 0xfdc55e, 0xf4eee1, 0xf5bf5c, 0xffc65f, 0xf5bf5b]
     }
 
     ; 进战后右下角的捕捉按钮区域
@@ -684,24 +693,24 @@ automaticallyFighting() {
     ; 自动战斗逻辑
     _automaticallyFighting() {
 
-        ; AddLog("isItInNormalCondition  " isItInNormalCondition())
-        ; AddLog("isEnterCombat  " isEnterCombat())
+        ; 检查是否已经进入战斗了, 如果没有就结束
         if !(!isItInNormalCondition() && isEnterCombat()) {
             return
         }
-        AddLog("进入战斗了, 检查是否是污染精灵")
 
-        ; 如果没有进战, 就直接退出了
-        if !AreaHasAllFeatureColors(IdentifyingFeatureInformation.enemyHpBarRegion, 5) {
+        AddLog("进入战斗了, 检查是否是污染精灵")
+        ; 如果对战的不是污染精灵, 这不进行操作
+        if !AreaHasAllFeatureColors(IdentifyingFeatureInformation.enemyHpBarRegion) {
             return
         }
 
 
         AddLog("检测到和污染精灵进入战斗, 开始自动释放技能")
         ; 检查一下是否打掉了第一条血
-        while !AreaHasAllFeatureColors(IdentifyingFeatureInformation.enemyCatchableRegion, 10) {
-            if AreaHasAllFeatureColors(IdentifyingFeatureInformation.shinyElfIndicatorRegion, 10) {
-                AddLog("检测到异色精灵!!!!!!!!!!!")
+        while !AreaHasAllFeatureColors(IdentifyingFeatureInformation.enemyCatchableRegion) {
+            if AreaHasAllFeatureColors(IdentifyingFeatureInformation.shinyElfIndicatorRegion)
+                && AreaHasAllFeatureColors(IdentifyingFeatureInformation.ordinaryElfRegion) {
+                AddLog("检测到异色精灵!!!")
                 endAutoBattle()
                 return
             }
@@ -709,6 +718,17 @@ automaticallyFighting() {
             if isItInNormalCondition() {
                 return
             }
+
+            if RunningStatus.automaticallyUseSkills {
+                return
+            }
+
+            ; 检查一下是否还存在聚气图标
+            if !AreaHasAllFeatureColors(IdentifyingFeatureInformation.gatherEnergy) {
+                return
+            }
+
+            ; 可以使用技能才使用技能
             SendKey("2")
             Sleep(2000)
         }
@@ -716,28 +736,27 @@ automaticallyFighting() {
         AddLog("检测到第一条血打掉了, 开始检测是否可以捕捉了")
         ; 打完了第一条血, 检查一下是否可以捕捉了
         while !AreaHasAllFeatureColors(IdentifyingFeatureInformation.captureButtonRegion, 10) {
+            if RunningStatus.automaticallyUseSkills {
+                return
+            }
+
             Sleep(2000)
         }
 
         AddLog("可以捕捉了, 检测一下是否出现了异色精灵")
-        if AreaHasAllFeatureColors(IdentifyingFeatureInformation.shinyElfIndicatorRegion, 10) {
-            AddLog("检测到异色精灵!!!!!!!!!!!")
+        if AreaHasAllFeatureColors(IdentifyingFeatureInformation.shinyElfIndicatorRegion, 10)
+            && AreaHasAllFeatureColors(IdentifyingFeatureInformation.ordinaryElfRegion) {
+            AddLog("检测到异色精灵!!!")
             endAutoBattle()
-
             return
         }
 
         ; while AreaHasAllFeatureColors(IdentifyingFeatureInformation.catchableElves, 10) {
         ;   Sleep(2000)
         ; }
-        AddLog("开始进行捕捉操作")
+        AddLog("准备进行捕捉操作")
         SendKey("w")
-        Sleep(500)
-
-
-        ; DrawRectangle(GuluBallIdentifyingFeature.captureBall.left, GuluBallIdentifyingFeature.captureBall.top,
-        ;   GuluBallIdentifyingFeature.captureBall.right, GuluBallIdentifyingFeature.captureBall.bottom)
-
+        Sleep(200)
 
         convertedRegion := GuluBallIdentifyingFeature.captureBall
         convertedColor := GuluBallIdentifyingFeature.buguang.colors
@@ -745,13 +764,9 @@ automaticallyFighting() {
         startY := convertedRegion.top
 
         while (startY < convertedRegion.bottom) {
-            AddLog("开始检测了")
-            ; DrawRectangle(convertedRegion.left, startY, convertedRegion.right, convertedRegion.bottom)
+            AddLog("开始查找是否存在捕光球")
             if PixelSearch(&x, &y, convertedRegion.left, startY, convertedRegion.right, convertedRegion.bottom,
                 convertedColor[1], 10) {
-                AddLog("第一个点检测成功")
-                ; DrawAccurate(x, y)
-                ; DrawRectangle(x - 60, y - 60, x + 60, y + 60)
                 for index, color in convertedColor {
                     if index == 1 {
                         continue
@@ -760,16 +775,13 @@ automaticallyFighting() {
                     if !PixelSearch(&_x, &_y, x - 60, y - 60, x + 60, y + 60, color, 10) {
                         AddLog(Format("检测失败, 当前色值: #{:06x}", color))
                         break
-                    } else {
-                        AddLog("循环检测中: " index)
-                        ; DrawAccurate(_x, _y)
                     }
 
-                    AddLog("发现捕光球")
+                    AddLog("发现捕光球, 准备使用捕光球进行捕捉")
                     Click(x, y)
-                    Sleep(100)
+                    AddLog("开始执行捕捉操作")
+                    Sleep(50)
                     SendKey("Space")
-                    AddLog("执行操作: 捕捉")
                     return
                 }
 
@@ -777,8 +789,7 @@ automaticallyFighting() {
 
 
             } else {
-                AddLog("检测失败")
-
+                AddLog("检测失败, 没有发现符合要求的咕噜球")
                 return
             }
         }
