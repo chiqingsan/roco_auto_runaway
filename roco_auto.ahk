@@ -6,7 +6,7 @@ CoordMode "Pixel", "Screen"
 ; #Include utils.ahk
 
 
-VERSION := "1.5"
+VERSION := "1.55"
 DEBUG_LOCALLOG := true  ; 是否开启本地调试日志
 
 class Config {
@@ -37,11 +37,16 @@ class RunningStatus {
 ; ui实例类
 class UIClass {
     static ui := ""  ;main gui
-    static gatherEnergyBtn := ""  ; 自动聚气按钮
-    static useSkills := "" ; 自动使用技能1
-    static runAwayBtn := ""  ; 自动逃跑按钮
-    static HoldHandsAutomaticallyBtn := ""  ; 自动牵手按钮
-    static automaticallyUseSkillsBtn := ""  ; 自动使用技能按钮
+    ; 自动聚气按钮
+    static gatherEnergyBtn := ""
+    ; 自动使用技能1
+    static useSkills := ""
+    ; 自动逃跑按钮
+    static runAwayBtn := ""
+    ; 自动牵手按钮
+    static HoldHandsAutomaticallyBtn := ""
+    ; 自动使用技能按钮
+    static automaticallyUseSkillsBtn := ""
     static logBox := ""  ; 日志显示框
 }
 
@@ -103,10 +108,10 @@ class IdentifyingFeatureInformation {
 
     ; 牵手的图标区域
     static holdHands := {
-        left: 1343,
-        top: 628,
-        right: 638 + 1343,
-        bottom: 337 + 628,
+        left: 1445,
+        top: 673,
+        right: 503 + 1445,
+        bottom: 236 + 673,
         colors: [0xdc9827, 0xfaf3e4, 0xf4eee1, 0x272727, 0x3d3d3d, 0xffffff] ;0x2a2928, 0xf4ba53
     }
 
@@ -138,13 +143,22 @@ class IdentifyingFeatureInformation {
         colors: [0xffc65f, 0x272727, 0xaf3d3e, 0xf4eee1, 0xffffff] ;, 0xf4eee1, 0xffffff
     }
 
+    ; 正常精灵血条 图标区域
+    static normalElfHealthBarRegion := {
+        left: 2096,
+        top: 0,
+        right: 464 + 2096,
+        bottom: 192 + 0,
+        colors: [0xffc65f, 0x272727, 0x73c615, 0xf4eee1, 0xffffff]
+    }
+
     ; 敌方污染击败后异色出现的图标区域
     static shinyElfIndicatorRegion := {
-        left: 1407,
-        top: 344,
-        right: 629 + 1407,
-        bottom: 656 + 344,
-        colors: [0x39a2cb, 0xfdc55e, 0xf4eee1, 0xf5bf5c, 0xffc65f, 0xf5bf5b]
+        left: 1343,
+        top: 179,
+        right: 1036 + 1343,
+        bottom: 1066 + 179,
+        colors: [0x39a2cb, 0xfdc55e, 0xf4eee1, 0xffc65f, 0xf5bf5b]
     }
 
     ; 进战后右下角的捕捉按钮区域
@@ -154,6 +168,15 @@ class IdentifyingFeatureInformation {
         right: 126 + 2124,
         bottom: 185 + 1234,
         colors: [0xb9b3ab, 0x2e252a, 0xf4eee1, 0x272727]
+    }
+
+    ; 进战后左边的技能区域
+    static combatSkillsRegion := {
+        left: 170,
+        top: 316,
+        right: 524 + 170,
+        bottom: 1005 + 316,
+        colors: [0x73c615, 0x26242a]
     }
 }
 
@@ -235,6 +258,91 @@ AreaHasAllFeatureColors(region, deviationValue := 10) {
 }
 
 
+; 在区域内查找：主色存在 + 附近一定范围内包含其它特征色
+; regionObj: 结构体（包含 left/top/right/bottom/colors）
+; diameter: 次色允许出现的直径范围
+; deviationValue: 色差容差
+AreaHasFeatureColorsWithAnchor(regionObj, diameter, deviationValue := 10) {
+    left := regionObj.left
+    top := regionObj.top
+    right := regionObj.right
+    bottom := regionObj.bottom
+    colors := regionObj.colors
+
+    if colors.Length < 2 {
+        return false
+    }
+
+    mainColor := colors[1]
+    radius := Floor(diameter / 2)
+
+    searchX := left
+    searchY := top
+
+    DrawRectangle(left, top, right, bottom)
+
+    ; 不断寻找主色
+    while true {
+        if !PixelSearch(&foundX, &foundY, searchX, searchY, right, bottom, mainColor, deviationValue) {
+            return false
+        }
+
+        ; 以主色为中心，构建子区域
+        subLeft := Max(left, foundX - radius)
+        subTop := Max(top, foundY - radius)
+        subRight := Min(right, foundX + radius)
+        subBottom := Min(bottom, foundY + radius)
+
+        DrawRectangle(subLeft, subTop, subRight, subBottom)
+
+
+        errorNum := 0
+        errorColor := 0
+
+        ; 检测剩余颜色
+        Loop colors.Length - 1 {
+            color := colors[A_Index + 1]
+
+            if !PixelSearch(&_, &_, subLeft, subTop, subRight, subBottom, color, deviationValue) {
+                errorNum++
+                errorColor := color
+
+                if errorNum > 1 {
+                    break
+                }
+            }
+        }
+
+        ; 如果全部通过
+        if errorNum == 0 {
+            return true
+        }
+
+        ; 允许一个失败 → 复检（提高容差）
+        if errorNum == 1 {
+            newDeviation := deviationValue + 10
+
+            if PixelSearch(&_, &_, subLeft, subTop, subRight, subBottom, errorColor, newDeviation) {
+                return true
+            }
+        }
+
+        ; 继续找下一个主色（避免卡死）
+        searchX := foundX + 1
+        searchY := foundY
+
+        if searchX >= right {
+            searchX := left
+            searchY := foundY + 1
+        }
+
+        if searchY >= bottom {
+            return false
+        }
+    }
+}
+
+
 ; ================== GUI ==================
 InitGui() {
     if FileExist("app.ico") {
@@ -308,6 +416,20 @@ QuickHide(*) {
 }
 
 
+; ui快捷键隐藏/显示
+QuickStopScript(*) {
+    AddLog("停止脚本操作")
+    RunningStatus.automaticallyUseSkills := false
+    RunningStatus.avoidWarState := 0
+
+
+    UIClass.gatherEnergyBtn.Text := "自动聚气: 关"
+    UIClass.runAwayBtn.Text := "自动逃跑: 关"
+    UIClass.useSkills.Text := "后台技能: 关"
+    UIClass.automaticallyUseSkillsBtn.Text := "自动战斗: 关"
+}
+
+
 ; ================== 入口 ==================
 Main() {
     ElevatePrivileges()
@@ -319,6 +441,7 @@ Main() {
     AddLog(Format("启动成功 工具版本 v{} , 当前屏幕分辨率: {}x{}", VERSION, Config.width, Config.height))
     ; 监听按键隐藏/显示ui
     Hotkey("~f9", QuickHide)
+    Hotkey("~f8", QuickStopScript)
 }
 Main()
 
@@ -574,6 +697,64 @@ whetherFighting() {
 }
 
 
+; 查找战斗中克制敌方的技能
+acquireRestraintSkills() {
+    skillArr := [
+        530 * Config.scaleY,
+        735 * Config.scaleY,
+        930 * Config.scaleY,
+        1125 * Config.scaleY
+    ]
+
+    ; 获取最近技能索引
+    getNearestIndex(value, arr) {
+        nearestIndex := 1
+        minDiff := Abs(value - arr[1])
+
+        Loop arr.Length - 1 {
+            index := A_Index + 1
+            diff := Abs(value - arr[index])
+
+            if (diff < minDiff) {
+                minDiff := diff
+                nearestIndex := index
+            }
+        }
+
+        return nearestIndex
+    }
+
+    AddLog("开始寻找是否存在克制敌方的技能")
+    if AreaHasFeatureColorsWithAnchor(
+        IdentifyingFeatureInformation.combatSkillsRegion,
+        50 * Config.scaleX
+    ) {
+        convertedRegion := GetScaledIdentifyingFeatureRegion(
+            IdentifyingFeatureInformation.combatSkillsRegion
+        )
+
+        if PixelSearch(
+            &x,
+            &y,
+            convertedRegion.left,
+            convertedRegion.top,
+            convertedRegion.right,
+            convertedRegion.bottom,
+            convertedRegion.colors[1]
+        ) {
+            ; num
+            res := String(getNearestIndex(y, skillArr))
+            AddLog("找到克制技能, 使用技能" res)
+            return res
+        }
+    }
+
+    AddLog("未找到克制敌方的技能, 默认使用技能2")
+    ; 默认技能2
+    return "2"
+}
+
+
 ; 判断是否进入了战斗
 isEnterCombat() {
     if AreaHasAllFeatureColors(IdentifyingFeatureInformation.hpInformation, 12) && getHealthBarColor() > 0 {
@@ -698,6 +879,14 @@ automaticallyFighting() {
             return
         }
 
+
+        ; 如果对战的是正常精灵, 则退出战斗
+        ; if AreaHasAllFeatureColors(IdentifyingFeatureInformation.normalElfHealthBarRegion) {
+        ;     AddLog("检测到正常精灵对战, 自动退出战斗")
+        ;     exitCombat()
+        ;     return
+        ; }
+
         AddLog("进入战斗了, 检查是否是污染精灵")
         ; 如果对战的不是污染精灵, 这不进行操作
         if !AreaHasAllFeatureColors(IdentifyingFeatureInformation.enemyHpBarRegion) {
@@ -708,35 +897,36 @@ automaticallyFighting() {
         AddLog("检测到和污染精灵进入战斗, 开始自动释放技能")
         ; 检查一下是否打掉了第一条血
         while !AreaHasAllFeatureColors(IdentifyingFeatureInformation.enemyCatchableRegion) {
-            if AreaHasAllFeatureColors(IdentifyingFeatureInformation.shinyElfIndicatorRegion)
-                && AreaHasAllFeatureColors(IdentifyingFeatureInformation.ordinaryElfRegion) {
-                AddLog("检测到异色精灵!!!")
-                endAutoBattle()
-                return
-            }
 
             if isItInNormalCondition() {
                 return
             }
 
-            if RunningStatus.automaticallyUseSkills {
-                return
-            }
-
             ; 检查一下是否还存在聚气图标
-            if !AreaHasAllFeatureColors(IdentifyingFeatureInformation.gatherEnergy) {
-                return
+            if AreaHasAllFeatureColors(IdentifyingFeatureInformation.gatherEnergy) {
+                if AreaHasFeatureColorsWithAnchor(IdentifyingFeatureInformation.shinyElfIndicatorRegion, 100 * Config.scaleX, 15) {
+                    AddLog("检测到异色精灵!!!")
+                    endAutoBattle()
+                    return
+                }
+
+                if !RunningStatus.automaticallyUseSkills {
+                    return
+                }
+
+                ; 可以使用技能才使用技能
+                SendKey(acquireRestraintSkills())
             }
 
-            ; 可以使用技能才使用技能
-            SendKey("2")
+
             Sleep(2000)
         }
 
         AddLog("检测到第一条血打掉了, 开始检测是否可以捕捉了")
         ; 打完了第一条血, 检查一下是否可以捕捉了
-        while !AreaHasAllFeatureColors(IdentifyingFeatureInformation.captureButtonRegion, 10) {
-            if RunningStatus.automaticallyUseSkills {
+        while !AreaHasAllFeatureColors(IdentifyingFeatureInformation.captureButtonRegion)
+            && !AreaHasAllFeatureColors(IdentifyingFeatureInformation.gatherEnergy) {
+            if !RunningStatus.automaticallyUseSkills {
                 return
             }
 
@@ -744,16 +934,14 @@ automaticallyFighting() {
         }
 
         AddLog("可以捕捉了, 检测一下是否出现了异色精灵")
-        if AreaHasAllFeatureColors(IdentifyingFeatureInformation.shinyElfIndicatorRegion, 10)
-            && AreaHasAllFeatureColors(IdentifyingFeatureInformation.ordinaryElfRegion) {
+        if AreaHasFeatureColorsWithAnchor(IdentifyingFeatureInformation.shinyElfIndicatorRegion, 100 * Config.scaleX, 15)
+            && AreaHasAllFeatureColors(IdentifyingFeatureInformation.ordinaryElfRegion, 15) {
             AddLog("检测到异色精灵!!!")
             endAutoBattle()
             return
         }
 
-        ; while AreaHasAllFeatureColors(IdentifyingFeatureInformation.catchableElves, 10) {
-        ;   Sleep(2000)
-        ; }
+
         AddLog("准备进行捕捉操作")
         SendKey("w")
         Sleep(200)
@@ -772,7 +960,13 @@ automaticallyFighting() {
                         continue
                     }
 
-                    if !PixelSearch(&_x, &_y, x - 60, y - 60, x + 60, y + 60, color, 10) {
+                    left := Max(convertedRegion.left, x - 60)
+                    top := Max(convertedRegion.top, y - 60)
+
+                    right := Min(convertedRegion.right, x + 60)
+                    bottom := Min(convertedRegion.bottom, y + 60)
+
+                    if !PixelSearch(&_x, &_y, left, top, right, bottom, color, 10) {
                         AddLog(Format("检测失败, 当前色值: #{:06x}", color))
                         break
                     }
@@ -785,7 +979,7 @@ automaticallyFighting() {
                     return
                 }
 
-                startY := Integer(y + 10)
+                startY := y + 10
 
 
             } else {
@@ -895,18 +1089,4 @@ clearLog() {
 
     ; 2. 清空缓存队列（关键）
     AddLog.lines := []
-}
-
-
-awaitTask(fun) {
-    tmep := false
-
-    while !tmep {
-
-        if fun() {
-            tmep := true
-        }
-
-        Sleep(100)
-    }
 }
