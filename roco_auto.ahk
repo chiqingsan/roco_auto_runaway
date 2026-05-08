@@ -279,7 +279,7 @@ AreaHasFeatureColorsWithAnchor(regionObj, diameter, deviationValue := 10) {
     searchX := left
     searchY := top
 
-    DrawRectangle(left, top, right, bottom)
+    ; DrawRectangle(left, top, right, bottom)
 
     ; 不断寻找主色
     while true {
@@ -293,7 +293,7 @@ AreaHasFeatureColorsWithAnchor(regionObj, diameter, deviationValue := 10) {
         subRight := Min(right, foundX + radius)
         subBottom := Min(bottom, foundY + radius)
 
-        DrawRectangle(subLeft, subTop, subRight, subBottom)
+        ; DrawRectangle(subLeft, subTop, subRight, subBottom)
 
 
         errorNum := 0
