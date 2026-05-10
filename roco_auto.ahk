@@ -6,7 +6,7 @@ CoordMode "Pixel", "Screen"
 ; #Include utils.ahk
 
 
-VERSION := "1.55"
+VERSION := "1.56"
 DEBUG_LOCALLOG := true  ; 是否开启本地调试日志
 
 class Config {
@@ -178,6 +178,16 @@ class IdentifyingFeatureInformation {
         bottom: 1005 + 316,
         colors: [0x73c615, 0x26242a]
     }
+
+
+    ; 精灵盒子下方放生图标区域
+    static releaseElfRegion := {
+        left: 78,
+        top: 1030,
+        right: 1572 + 78,
+        bottom: 362 + 1030,
+        colors: [0xaf3d3e, 0x141414, 0xc4c2b6, 0x292929, 0xf4eee0, 0xffc65f]
+    }
 }
 
 
@@ -293,7 +303,7 @@ AreaHasFeatureColorsWithAnchor(regionObj, diameter, deviationValue := 10) {
         subRight := Min(right, foundX + radius)
         subBottom := Min(bottom, foundY + radius)
 
-        ; DrawRectangle(subLeft, subTop, subRight, subBottom)
+        DrawRectangle(subLeft, subTop, subRight, subBottom)
 
 
         errorNum := 0
@@ -418,7 +428,7 @@ QuickHide(*) {
 
 ; ui快捷键隐藏/显示
 QuickStopScript(*) {
-    AddLog("停止脚本操作")
+    AddLog("停止自动战斗功能")
     RunningStatus.automaticallyUseSkills := false
     RunningStatus.avoidWarState := 0
 
@@ -429,6 +439,42 @@ QuickStopScript(*) {
     UIClass.automaticallyUseSkillsBtn.Text := "自动战斗: 关"
 }
 
+
+; 批量选择整页精灵
+QicklySelectTheEntirePageWizard(*) {
+    ; 检查是否符合条件, 不在精灵盒子界面就不执行
+
+    ; 检查前台程序是否为洛克王国
+    activeExe := WinGetProcessName("A")
+    if (activeExe != "NRC-Win64-Shipping.exe") {
+        AddLog("提示: 当前活动窗口不是洛克王国, 无法执行批量选择整页精灵")
+        return
+    }
+
+    ; 检查是否为精灵盒子放生界面
+    if !AreaHasAllFeatureColors(IdentifyingFeatureInformation.releaseElfRegion) {
+        AddLog("提示: 当前不在精灵盒子放生界面, 无法执行批量选择整页精灵")
+        return
+    }
+
+    ; 原始起点坐标d1 490 334 ; d2 662 334; d3 490 501
+    startingPoint_x := 490 * Config.scaleX
+    startingPoint_y := 334 * Config.scaleY
+
+    interval_x := 172 * Config.scaleX
+    interval_y := 167 * Config.scaleY
+
+    loop 5 {
+        now_y := startingPoint_y + (A_Index - 1) * interval_y
+        Loop 6 {
+            now_x := startingPoint_x + (A_Index - 1) * interval_x
+            res := GetRandomPoint(now_x, now_y, 70 * Config.scaleX)
+            Click(res[1], res[2])
+            Sleep(Random(50, 180))
+            ; DrawAccurate(res[1], res[2])
+        }
+    }
+}
 
 ; ================== 入口 ==================
 Main() {
@@ -442,6 +488,7 @@ Main() {
     ; 监听按键隐藏/显示ui
     Hotkey("~f9", QuickHide)
     Hotkey("~f8", QuickStopScript)
+    Hotkey("~k", QicklySelectTheEntirePageWizard)
 }
 Main()
 
@@ -1036,6 +1083,23 @@ ControlSendKey(key, time, exe) {
 ; 给洛克王国发送按键事件
 SendKeyToRoco(key, time := 50) {
     ControlSendKey(key, time, "NRC-Win64-Shipping.exe")
+}
+
+
+; 获取随机点坐标, 以(x,y)为中心, diameter为直径范围
+GetRandomPoint(x, y, diameter) {
+    radius := diameter / 2
+
+    ; 随机角度（弧度）
+    angle := Random(0, 360) * (3.1415926 / 180)
+
+    ; 随机半径
+    r := Sqrt(Random(0, 1000000) / 1000000) * radius
+
+    newX := Round(x + Cos(angle) * r)
+    newY := Round(y + Sin(angle) * r)
+
+    return [newX, newY]
 }
 
 
