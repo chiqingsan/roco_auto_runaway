@@ -3,10 +3,10 @@
 CoordMode "Pixel", "Screen"
 
 #Include localFileLogger.ahk
-; #Include utils.ahk
+#Include utils.ahk
 
 
-VERSION := "1.56"
+VERSION := "1.6"
 DEBUG_LOCALLOG := true  ; 是否开启本地调试日志
 
 class Config {
@@ -186,7 +186,8 @@ class IdentifyingFeatureInformation {
         top: 1030,
         right: 1572 + 78,
         bottom: 362 + 1030,
-        colors: [0xaf3d3e, 0x141414, 0xc4c2b6, 0x292929, 0xf4eee0, 0xffc65f]
+        colors: [0xaf3d3e, 0x141414, 0xc4c2b6, 0x292929, 0xf4eee0, 0xffc346]
+            ; [#af3d3e, #141414, #c4c2b6, #292929, #f4eee0, #ffc65f]
     }
 }
 
@@ -338,12 +339,12 @@ AreaHasFeatureColorsWithAnchor(regionObj, diameter, deviationValue := 10) {
         }
 
         ; 继续找下一个主色（避免卡死）
-        searchX := foundX + 1
+        searchX := foundX + 10
         searchY := foundY
 
         if searchX >= right {
             searchX := left
-            searchY := foundY + 1
+            searchY := foundY + 10
         }
 
         if searchY >= bottom {
@@ -380,8 +381,8 @@ InitGui() {
     UIClass.runAwayBtn := ui.AddButton("xm y+5 w95 h30", "自动逃跑: 关")
     UIClass.runAwayBtn.OnEvent("Click", onClickRunAwayBtn)
 
-    UIClass.useSkills := ui.AddButton("xm y+5 w95 h30", "后台技能: 关")
-    UIClass.useSkills.OnEvent("Click", onClickUseSkillsBtn)
+    ; UIClass.useSkills := ui.AddButton("xm y+5 w95 h30", "后台技能: 关")
+    ; UIClass.useSkills.OnEvent("Click", onClickUseSkillsBtn)
 
     UIClass.HoldHandsAutomaticallyBtn := ui.AddButton("xm y+5 w95 h30", "自动牵手: 关")
     UIClass.HoldHandsAutomaticallyBtn.OnEvent("Click", onHoldHandsAutomaticallyBtn)
@@ -395,7 +396,7 @@ InitGui() {
 
     ; GuiCtrl := ui.AddStatusBar("h30", "运行中...")
 
-    UIClass.logBox := ui.AddEdit("ym x+6 w192 h165 ReadOnly -Border -VScroll -HScroll +Disabled")
+    UIClass.logBox := ui.AddEdit("ym x+6 w177 h130 ReadOnly -Border -VScroll -HScroll +Disabled")
     UIClass.logBox.SetFont("s9 c000000", "Consolas")
 
 
@@ -408,8 +409,8 @@ InitGui() {
 
 
     UIClass.ui := ui
-    ; w315 h165
-    ui.Show("w315 h180 NoActivate")
+    ; w315 h180
+    ui.Show("w300 h145 NoActivate")
 }
 
 
@@ -461,7 +462,7 @@ QicklySelectTheEntirePageWizard(*) {
     startingPoint_x := 490 * Config.scaleX
     startingPoint_y := 334 * Config.scaleY
 
-    interval_x := 172 * Config.scaleX
+    interval_x := 170 * Config.scaleX
     interval_y := 167 * Config.scaleY
 
     loop 5 {
@@ -469,8 +470,9 @@ QicklySelectTheEntirePageWizard(*) {
         Loop 6 {
             now_x := startingPoint_x + (A_Index - 1) * interval_x
             res := GetRandomPoint(now_x, now_y, 70 * Config.scaleX)
-            Click(res[1], res[2])
-            Sleep(Random(50, 180))
+            ; Click(res[1], res[2])
+            DD.Click_xy(res[1], res[2])
+            Sleep(Random(30, 50))
             ; DrawAccurate(res[1], res[2])
         }
     }
@@ -485,10 +487,16 @@ Main() {
     LocalFileLogger.init()
     LocalFileLogger.info(Format("==========启动成功 工具版本 v{} , 当前屏幕分辨率: {}x{}==========", VERSION, Config.width, Config.height))
     AddLog(Format("启动成功 工具版本 v{} , 当前屏幕分辨率: {}x{}", VERSION, Config.width, Config.height))
+
+    if DD.Init() {
+        AddLog("DD键鼠驱动加载成功!")
+    } else {
+        AddLog("DD键鼠驱动加载失败, 按键操作可能无响应")
+    }
     ; 监听按键隐藏/显示ui
     Hotkey("~f9", QuickHide)
     Hotkey("~f8", QuickStopScript)
-    Hotkey("~k", QicklySelectTheEntirePageWizard)
+    Hotkey("~!k", QicklySelectTheEntirePageWizard)
 }
 Main()
 
@@ -855,7 +863,8 @@ exitCombat() {
         Sleep(1000)
         if PixelSearch(&x, &y, Config.width * 0.5, Config.height * 0.7, Config.width, Config.height, 0xf4eee1, 5) {
             AddLog("执行操作: 自动逃跑")
-            Click(x, y + 10)
+            ; Click(x, y + 10)
+            DD.Click_xy(x, y + 10)
         }
     }
 }
@@ -1019,7 +1028,8 @@ automaticallyFighting() {
                     }
 
                     AddLog("发现捕光球, 准备使用捕光球进行捕捉")
-                    Click(x, y)
+                    ; Click(x, y)
+                    DD.Click_xy(x, y)
                     AddLog("开始执行捕捉操作")
                     Sleep(50)
                     SendKey("Space")
@@ -1066,9 +1076,10 @@ isItInNormalCondition() {
 
 ; 发送按键事件
 SendKey(str, time := 50) {
-    Send("{" str " down}")
-    Sleep(time)
-    Send("{" str " up}")
+    ; Send("{" str " down}")
+    ; Sleep(time)
+    ; Send("{" str " up}")
+    DD.SendKey(str, 50)
 }
 
 
