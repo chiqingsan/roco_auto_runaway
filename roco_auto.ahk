@@ -6,7 +6,7 @@ CoordMode "Pixel", "Screen"
 #Include utils.ahk
 
 
-VERSION := "1.6"
+VERSION := "1.61"
 DEBUG_LOCALLOG := true  ; 是否开启本地调试日志
 
 class Config {
@@ -40,7 +40,7 @@ class UIClass {
     ; 自动聚气按钮
     static gatherEnergyBtn := ""
     ; 自动使用技能1
-    static useSkills := ""
+    ; static useSkills := ""
     ; 自动逃跑按钮
     static runAwayBtn := ""
     ; 自动牵手按钮
@@ -436,7 +436,7 @@ QuickStopScript(*) {
 
     UIClass.gatherEnergyBtn.Text := "自动聚气: 关"
     UIClass.runAwayBtn.Text := "自动逃跑: 关"
-    UIClass.useSkills.Text := "后台技能: 关"
+    ; UIClass.useSkills.Text := "后台技能: 关"
     UIClass.automaticallyUseSkillsBtn.Text := "自动战斗: 关"
 }
 
@@ -586,17 +586,11 @@ ActivateWindowById(hwnd) {
 ModifyMutuallyExclusiveUIStates() {
     if (RunningStatus.avoidWarState == 1) {
         UIClass.runAwayBtn.Text := "自动逃跑: 关"
-        UIClass.useSkills.Text := "后台技能: 关"
     } else if (RunningStatus.avoidWarState == 2) {
         UIClass.gatherEnergyBtn.Text := "自动聚气: 关"
-        UIClass.useSkills.Text := "后台技能: 关"
-    } else if (RunningStatus.avoidWarState == 3) {
-        UIClass.gatherEnergyBtn.Text := "自动聚气: 关"
-        UIClass.runAwayBtn.Text := "自动逃跑: 关"
     } else if (RunningStatus.avoidWarState == 0) {
         UIClass.gatherEnergyBtn.Text := "自动聚气: 关"
         UIClass.runAwayBtn.Text := "自动逃跑: 关"
-        UIClass.useSkills.Text := "后台技能: 关"
     }
 
     if RunningStatus.automaticallyUseSkills {
@@ -653,34 +647,34 @@ onClickRunAwayBtn(ctrl, *) {
 
 
 ; 后台使用技能1
-onClickUseSkillsBtn(ctrl, *) {
+; onClickUseSkillsBtn(ctrl, *) {
 
-    if !ProcessExist("NRC-Win64-Shipping.exe") {
-        AddLog("提示: 未检测到洛克王国游戏程序, 无法执行自动使用技能1")
-        RunningStatus.avoidWarState := 0
-        UIClass.useSkills.Text := "后台技能1: 关"
-        return
-    }
+;     if !ProcessExist("NRC-Win64-Shipping.exe") {
+;         AddLog("提示: 未检测到洛克王国游戏程序, 无法执行自动使用技能1")
+;         RunningStatus.avoidWarState := 0
+;         UIClass.useSkills.Text := "后台技能1: 关"
+;         return
+;     }
 
 
-    if RunningStatus.avoidWarState != 3 {
-        ; 修改一下状态
-        RunningStatus.avoidWarState := 3
-        RunningStatus.automaticallyUseSkills := false
-        ; 修改按键文字
-        ctrl.Text := "后台技能: 开"
-        ModifyMutuallyExclusiveUIStates()
-        AddLog("后台使用技能已开启")
-        automaticallyUseSkill1()
-        return
-    }
+;     if RunningStatus.avoidWarState != 3 {
+;         ; 修改一下状态
+;         RunningStatus.avoidWarState := 3
+;         RunningStatus.automaticallyUseSkills := false
+;         ; 修改按键文字
+;         ctrl.Text := "后台技能: 开"
+;         ModifyMutuallyExclusiveUIStates()
+;         AddLog("后台使用技能已开启")
+;         automaticallyUseSkill1()
+;         return
+;     }
 
-    ; 修改一下状态
-    RunningStatus.avoidWarState := 0
-    ; 修改按键文字
-    ctrl.Text := "后台技能: 关"
-    AddLog("后台使用技能已关闭")
-}
+;     ; 修改一下状态
+;     RunningStatus.avoidWarState := 0
+;     ; 修改按键文字
+;     ctrl.Text := "后台技能: 关"
+;     AddLog("后台使用技能已关闭")
+; }
 
 
 ; 自动牵手
