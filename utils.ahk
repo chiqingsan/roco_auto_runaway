@@ -7,23 +7,14 @@
 ; }
 
 class TaskQueue {
-    __New(interval := 100) {
+    __New(interval := 50) {
         this.queue := []
         this.running := false
         this.interval := interval
         this._currentTimer := ""
+        this._inAction := false   ; [关键]新增标志位，防止重入
     }
 
-    ; Add a wait task. actionFn runs when condFn returns true.
-    AddWait(condFn, actionFn) {
-        this.queue.Push({
-            type: "wait",
-            cond: condFn,
-            action: actionFn
-        })
-    }
-
-    ; Add a one-shot delay task.
     AddDelay(delay, actionFn) {
         this.queue.Push({
             type: "delay",
@@ -32,86 +23,57 @@ class TaskQueue {
         })
     }
 
-    ; Start processing queued tasks.
     Start() {
         if this.running
             return
-
         this.running := true
         this._runNext()
     }
 
-    ; Stop processing without clearing the queue.
     Stop() {
         this._stopCurrentTimer()
         this.running := false
     }
 
-    ; Clear queued tasks and stop the active timer.
     Clear() {
         this.Stop()
         this.queue := []
     }
 
-    ; Return queued task count.
-    Size() {
-        return this.queue.Length
-    }
-
-    ; Return whether the queue is active.
-    IsRunning() {
-        return this.running
-    }
-
     _runNext() {
+        if this._inAction  ; 防止重入
+            return
         this._stopCurrentTimer()
-
         if !this.running
             return
-
         if (this.queue.Length = 0) {
             this.running := false
             return
         }
 
+        this._inAction := true
         task := this.queue.RemoveAt(1)
-
-        if (task.type = "wait") {
-            this._runWaitTask(task)
-        } else if (task.type = "delay") {
+        if (task.type = "delay") {
             this._runDelayTask(task)
         }
-    }
-
-    _runWaitTask(task) {
-        this._currentTimer := ObjBindMethod(this, "_checkWaitTask", task)
-        SetTimer(this._currentTimer, this.interval)
-    }
-
-    _checkWaitTask(task) {
-        if !this.running {
-            this._stopCurrentTimer()
-            return
-        }
-
-        if task.cond.Call() {
-            this._stopCurrentTimer()
-            task.action.Call()
-            this._runNext()
-        }
+        this._inAction := false
     }
 
     _runDelayTask(task) {
-        this._currentTimer := ObjBindMethod(this, "_runDelayTaskNow", task)
-        SetTimer(this._currentTimer, -task.delay)
+        if (task.delay == 0) {
+            ; [关键]延迟0使用-SetTimer确保顺序
+            timerFn := ObjBindMethod(this, "_runDelayTaskNow", task)
+            SetTimer(timerFn, -1)
+        } else {
+            this._currentTimer := ObjBindMethod(this, "_runDelayTaskNow", task)
+            SetTimer(this._currentTimer, -task.delay)
+        }
     }
 
     _runDelayTaskNow(task) {
         this._stopCurrentTimer()
-
         if !this.running
             return
-
         task.action.Call()
         this._runNext()
     }
@@ -123,7 +85,6 @@ class TaskQueue {
         }
     }
 }
-
 
 class DD {
     static isInit := false

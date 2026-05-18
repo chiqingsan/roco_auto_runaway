@@ -6,7 +6,7 @@ CoordMode "Pixel", "Screen"
 #Include utils.ahk
 
 
-VERSION := "1.61"
+VERSION := "1.67"
 DEBUG_LOCALLOG := true  ; 是否开启本地调试日志
 
 class Config {
@@ -29,6 +29,13 @@ class RunningStatus {
     ; 是否启动自动战斗技能
     static automaticallyUseSkills := false
 
+    ; 是否开启自动丢球
+    static automaticallyLoseTheBall := false
+    ; 丢球轮次是否执行完毕
+    static automaticallyLoseTheBallRoundFinished := false
+
+    ; 调试
+    static index := 0
     ; 当前ui状态, 0: 隐藏, 1: 显示
     static uiState := 1
 }
@@ -205,7 +212,7 @@ class GuluBallIdentifyingFeature {
 
     ; 捕光球
     static buguang := {
-        colors: [0xffffd5, 0x3e4cc8, 0xff293, 0xf1d186, 0xe7cd83]
+        colors: [0xffffd5, 0x3e4cc8, 0xfeb24c, 0xf1d186, 0xe7cd83]
     }
 }
 
@@ -427,7 +434,7 @@ QuickHide(*) {
 }
 
 
-; ui快捷键隐藏/显示
+; 停止自动战斗
 QuickStopScript(*) {
     AddLog("停止自动战斗功能")
     RunningStatus.automaticallyUseSkills := false
@@ -471,12 +478,68 @@ QicklySelectTheEntirePageWizard(*) {
             now_x := startingPoint_x + (A_Index - 1) * interval_x
             res := GetRandomPoint(now_x, now_y, 70 * Config.scaleX)
             ; Click(res[1], res[2])
-            DD.Click_xy(res[1], res[2])
+            click_xy(res[1], res[2])
+            ; runPython_click(res[1], res[2])
             Sleep(Random(30, 50))
             ; DrawAccurate(res[1], res[2])
         }
     }
 }
+
+
+; 自动丢球
+QuickAutomaticallyLoseTheBall(*) {
+    if !RunningStatus.automaticallyLoseTheBall {
+        RunningStatus.automaticallyLoseTheBall := true
+        AddLog("自动丢球已开启")
+
+        automaticallyLoseTheBall()
+    } else {
+        RunningStatus.automaticallyLoseTheBall := false
+        AddLog("自动丢球已关闭")
+    }
+}
+
+automaticallyLoseTheBall() {
+    SetTimer(automaticallyLoseTheBall, 0)
+
+    if !RunningStatus.automaticallyLoseTheBall {
+        return
+    }
+
+
+    if !RunningStatus.automaticallyLoseTheBallRoundFinished {
+        RunningStatus.automaticallyLoseTheBallRoundFinished := true
+        task := TaskQueue()
+
+        temp1() {
+            DD.Btn(1)
+        }
+
+        temp2() {
+            DD.Btn(2)
+        }
+
+        temp3() {
+            DD.KeyDown(DD.getKeyCode("shift"))
+        }
+
+        temp4() {
+            DD.KeyUp(DD.getKeyCode("shift"))
+        }
+
+        task.AddDelay(0, temp1)
+        task.AddDelay(Random(180, 200), temp2)
+        task.AddDelay(Random(130, 140), temp3)
+        task.AddDelay(Random(40, 50), temp4)
+        task.AddDelay(0, () => RunningStatus.automaticallyLoseTheBallRoundFinished := false)
+
+        task.Start()
+    }
+
+    SetTimer(automaticallyLoseTheBall, 100)
+}
+
 
 ; ================== 入口 ==================
 Main() {
@@ -488,14 +551,19 @@ Main() {
     LocalFileLogger.info(Format("==========启动成功 工具版本 v{} , 当前屏幕分辨率: {}x{}==========", VERSION, Config.width, Config.height))
     AddLog(Format("启动成功 工具版本 v{} , 当前屏幕分辨率: {}x{}", VERSION, Config.width, Config.height))
 
-    if DD.Init() {
-        AddLog("DD键鼠驱动加载成功!")
+    if DD.Init() != 1 {
+        LocalFileLogger.error("DD键鼠驱动初始化失败, 无法继续执行脚本")
+        AddLog("DD键鼠驱动初始化失败, 无法继续执行脚本, 请检查dd63330.dll是否存在当前目录下")
+        ExitApp()
     } else {
-        AddLog("DD键鼠驱动加载失败, 按键操作可能无响应")
+        LocalFileLogger.info("DD键鼠驱动初始化成功")
+        AddLog("DD键鼠驱动初始化成功")
     }
+
     ; 监听按键隐藏/显示ui
     Hotkey("~f9", QuickHide)
     Hotkey("~f8", QuickStopScript)
+    Hotkey("~f7", QuickAutomaticallyLoseTheBall)
     Hotkey("~!k", QicklySelectTheEntirePageWizard)
 }
 Main()
@@ -858,7 +926,8 @@ exitCombat() {
         if PixelSearch(&x, &y, Config.width * 0.5, Config.height * 0.7, Config.width, Config.height, 0xf4eee1, 5) {
             AddLog("执行操作: 自动逃跑")
             ; Click(x, y + 10)
-            DD.Click_xy(x, y + 10)
+            click_xy(x, y + 10)
+            ; runPython_click(x, y + 10)
         }
     }
 }
@@ -994,7 +1063,7 @@ automaticallyFighting() {
 
         AddLog("准备进行捕捉操作")
         SendKey("w")
-        Sleep(200)
+        Sleep(500)
 
         convertedRegion := GuluBallIdentifyingFeature.captureBall
         convertedColor := GuluBallIdentifyingFeature.buguang.colors
@@ -1023,7 +1092,8 @@ automaticallyFighting() {
 
                     AddLog("发现捕光球, 准备使用捕光球进行捕捉")
                     ; Click(x, y)
-                    DD.Click_xy(x, y)
+                    ; runPython_click(x, y)
+                    click_xy(x, y)
                     AddLog("开始执行捕捉操作")
                     Sleep(50)
                     SendKey("Space")
@@ -1073,7 +1143,17 @@ SendKey(str, time := 50) {
     ; Send("{" str " down}")
     ; Sleep(time)
     ; Send("{" str " up}")
+    ; runPython_key(str, 50)
     DD.SendKey(str, 50)
+}
+
+
+click_xy(x := -1, y := -1) {
+    if (x != -1 && y != -1) {
+        DD.Click_xy(x, y)
+    } else {
+        DD.Click()
+    }
 }
 
 
@@ -1159,3 +1239,22 @@ clearLog() {
     ; 2. 清空缓存队列（关键）
     AddLog.lines := []
 }
+
+
+; python := "C:\Users\chiqingsan\Desktop\pythonTest\venv\Scripts\pythonw.exe"
+; script := "C:\Users\chiqingsan\Desktop\pythonTest\esp_hid.py"
+
+; RunWait '"' python '" "' script '" click 180 100', , "Hide"
+
+
+; runPython_click(x := -1, y := -1) {
+;     if (x != -1 && y != -1) {
+;         Run '"' python '" "' script '" click ' x ' ' y, , "Hide"
+;     } else {
+;         Run '"' python '" "' script '" click', , "Hide"
+;     }
+; }
+
+; runPython_key(key, time := 50) {
+;     Run '"' python '" "' script '" key ' key ' ' time, , "Hide"
+; }
